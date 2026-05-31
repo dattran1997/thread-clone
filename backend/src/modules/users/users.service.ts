@@ -91,11 +91,14 @@ export class UsersService {
   }
 
   async getFollowers(userId: string, cursor?: string, limit = 20) {
-    const where = { followingId: userId, status: "ACCEPTED" as const };
     const items = await this.prisma.follow.findMany({
-      where,
+      where: { followingId: userId, status: "ACCEPTED" },
       take: limit + 1,
-      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+      // Cursor is the followerId from the previous page's last row
+      ...(cursor && {
+        cursor: { followerId_followingId: { followerId: cursor, followingId: userId } },
+        skip: 1,
+      }),
       include: { follower: { select: { id: true, username: true, displayName: true, avatarUrl: true, isVerified: true } } },
       orderBy: { createdAt: "desc" },
     });
@@ -103,17 +106,20 @@ export class UsersService {
     const data = items.slice(0, limit);
     return {
       data: data.map((f) => ({ ...f.follower, followedAt: f.createdAt })),
-      nextCursor: hasMore ? data[data.length - 1].id : null,
+      nextCursor: hasMore ? data[data.length - 1].followerId : null,
       hasMore,
     };
   }
 
   async getFollowing(userId: string, cursor?: string, limit = 20) {
-    const where = { followerId: userId, status: "ACCEPTED" as const };
     const items = await this.prisma.follow.findMany({
-      where,
+      where: { followerId: userId, status: "ACCEPTED" },
       take: limit + 1,
-      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+      // Cursor is the followingId from the previous page's last row
+      ...(cursor && {
+        cursor: { followerId_followingId: { followerId: userId, followingId: cursor } },
+        skip: 1,
+      }),
       include: { following: { select: { id: true, username: true, displayName: true, avatarUrl: true, isVerified: true } } },
       orderBy: { createdAt: "desc" },
     });
@@ -121,7 +127,7 @@ export class UsersService {
     const data = items.slice(0, limit);
     return {
       data: data.map((f) => ({ ...f.following, followedAt: f.createdAt })),
-      nextCursor: hasMore ? data[data.length - 1].id : null,
+      nextCursor: hasMore ? data[data.length - 1].followingId : null,
       hasMore,
     };
   }

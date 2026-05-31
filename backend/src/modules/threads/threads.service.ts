@@ -25,7 +25,6 @@ const THREAD_SELECT = {
   repostCount: true,
   quoteCount: true,
   viewCount: true,
-  hashtags: true,
   topics: true,
   createdAt: true,
   author: {
@@ -41,6 +40,12 @@ const THREAD_SELECT = {
   poll: {
     include: {
       options: { orderBy: { order: "asc" as const } },
+    },
+  },
+  // Hashtags — include the actual tag text via the relation
+  hashtags: {
+    select: {
+      hashtag: { select: { id: true, tag: true } },
     },
   },
 };
@@ -77,7 +82,6 @@ export class ThreadsService {
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         isDraft: dto.isDraft ?? false,
         editableUntil,
-        hashtags: dto.hashtags ?? [],
         topics: dto.topics ?? [],
         ...(dto.poll && {
           poll: {
@@ -90,7 +94,7 @@ export class ThreadsService {
           },
         }),
       },
-      select: THREAD_SELECT,
+      select: { id: true },
     });
 
     // Wire media if provided
@@ -101,6 +105,20 @@ export class ThreadsService {
       });
     }
 
+    // Process hashtags via upsert into Hashtag table + ThreadHashtag join
+    if (dto.hashtags?.length) {
+      for (const tag of dto.hashtags) {
+        const hashtag = await this.prisma.hashtag.upsert({
+          where: { tag },
+          create: { tag, threadCount: 1 },
+          update: { threadCount: { increment: 1 } },
+        });
+        await this.prisma.threadHashtag.create({
+          data: { threadId: thread.id, hashtagId: hashtag.id },
+        }).catch(() => { /* ignore duplicate */ });
+      }
+    }
+
     // Increment parent reply count
     if (dto.parentId) {
       await this.prisma.thread.update({
@@ -109,7 +127,8 @@ export class ThreadsService {
       });
     }
 
-    return thread;
+    // Fetch and return the full thread shape
+    return this.fetchFull(thread.id, userId);
   }
 
   // ── Get single thread ──────────────────────────────────────────────────────
@@ -118,15 +137,15 @@ export class ThreadsService {
       where: { id },
       select: {
         ...THREAD_SELECT,
-        likes: viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
+        likes:   viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
         reposts: viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
-        saves: viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
+        saves:   viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
       },
     });
     if (!thread || thread.status === "DELETED") throw new NotFoundException("Thread not found");
 
-    // Increment view count
-    await this.prisma.thread.update({ where: { id }, data: { viewCount: { increment: 1 } } });
+    // Increment view count (fire-and-forget)
+    this.prisma.thread.update({ where: { id }, data: { viewCount: { increment: 1 } } }).catch(() => {});
 
     return this.withViewerState(thread, viewerId);
   }
@@ -168,7 +187,6 @@ export class ThreadsService {
       data: {
         ...(dto.text !== undefined && { text: dto.text }),
         ...(dto.topics !== undefined && { topics: dto.topics }),
-        ...(dto.hashtags !== undefined && { hashtags: dto.hashtags }),
         isEdited: true,
       },
       select: THREAD_SELECT,
@@ -201,15 +219,21 @@ export class ThreadsService {
       throw new UnprocessableEntityException("Poll has closed");
     }
 
-    const existing = await this.prisma.pollVote.findUnique({
-      where: { userId_pollId: { userId, pollId: option.pollId } },
+    // Check if user already voted on any option of this poll
+    const existing = await this.prisma.pollVote.findFirst({
+      where: {
+        userId,
+        option: { pollId: option.pollId },
+      },
     });
     if (existing) throw new UnprocessableEntityException("Already voted");
 
     await this.prisma.$transaction([
-      this.prisma.pollVote.create({ data: { userId, pollId: option.pollId, optionId } }),
-      this.prisma.pollOption.update({ where: { id: optionId }, data: { voteCount: { increment: 1 } } }),
-      this.prisma.poll.update({ where: { id: option.pollId }, data: { totalVotes: { increment: 1 } } }),
+      this.prisma.pollVote.create({ data: { userId, pollOptionId: optionId } }),
+      this.prisma.pollOption.update({
+        where: { id: optionId },
+        data: { voteCount: { increment: 1 } },
+      }),
     ]);
 
     return this.findOne(threadId, userId);
@@ -258,15 +282,28 @@ export class ThreadsService {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+  private async fetchFull(id: string, viewerId?: string) {
+    const thread = await this.prisma.thread.findUniqueOrThrow({
+      where: { id },
+      select: {
+        ...THREAD_SELECT,
+        likes:   viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
+        reposts: viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
+        saves:   viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
+      },
+    });
+    return this.withViewerState(thread, viewerId);
+  }
+
   private withViewerState(thread: any, viewerId?: string) {
     return {
       ...thread,
-      isLiked: viewerId ? (thread.likes?.length > 0) : false,
+      isLiked:    viewerId ? (thread.likes?.length > 0)   : false,
       isReposted: viewerId ? (thread.reposts?.length > 0) : false,
-      isSaved: viewerId ? (thread.saves?.length > 0) : false,
-      likes: undefined,
+      isSaved:    viewerId ? (thread.saves?.length > 0)   : false,
+      likes:   undefined,
       reposts: undefined,
-      saves: undefined,
+      saves:   undefined,
     };
   }
 }

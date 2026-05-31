@@ -196,6 +196,7 @@ model Thread {
   reposts  ThreadRepost[]
   saves    ThreadSave[]
   quotes   ThreadQuote[]
+  topics   String[]
   hashtags ThreadHashtag[]
   mentions Mention[]
   poll     Poll?
