@@ -12,6 +12,15 @@ Paired with `../backend` (NestJS API on port 3001).
 - **Real-time**: Socket.io client (singleton in `lib/ws.ts`)
 - **UI primitives**: Radix UI (`@radix-ui/react-dialog`, `@radix-ui/react-tabs`)
 
+## Shared types
+All TypeScript types shared between frontend and backend live in `../shared/types/`.
+Import them using the `@shared/*` path alias (wired in `tsconfig.json`):
+```ts
+import type { Thread, CreateThreadDto } from "@shared/types";
+import type { UserSummary }             from "@shared/types/user";
+```
+**Never re-declare** a type that already exists in `@shared/types`. If you need a new shared shape, add it there first.
+
 ## Key conventions
 - **Server Components by default** — only add `"use client"` when you need interactivity or browser APIs
 - **Named exports only** — no default exports anywhere

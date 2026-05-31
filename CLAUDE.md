@@ -65,6 +65,6 @@ git push origin master
 - `fix(sprint-2): feed pagination cursor bug` — bug fix within a sprint
 - `chore(sprint-3): update PLAN.md module checklist` — docs/admin only
 
-## Pending decisions (answer in PLAN.md when decided)
-- [ ] Decision B: Create a `shared/` folder for TypeScript types shared between frontend/backend?
-- [ ] Decision C: Confirmed lowercase folder names (frontend/ backend/) — good for Linux/Pi compatibility
+## Pending decisions
+- [x] Decision B: `shared/` folder created at project root. Import via `@shared/*` alias in both apps.
+- [x] Decision C: Confirmed lowercase folder names (frontend/ backend/) — good for Linux/Pi compatibility

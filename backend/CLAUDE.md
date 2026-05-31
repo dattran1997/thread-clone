@@ -13,6 +13,18 @@ Paired with `../frontend` (Next.js 15).
 - **Storage**: MinIO (S3-compatible)
 - **Docs**: Swagger auto-generated at `/api/docs`
 
+## Shared types
+All TypeScript types shared between frontend and backend live in `../shared/types/`.
+Import them using the `@shared/*` path alias (wired in `tsconfig.json`):
+```ts
+import type { Thread, CreateThreadDto } from "@shared/types";
+import type { UserSummary }             from "@shared/types/user";
+```
+**Never re-declare** a type that already exists in `@shared/types`. If you need a new shared shape, add it to the shared package first, then import it here.
+
+> **Runtime note**: Path aliases are resolved at build time by NestJS CLI (`tsconfig-paths`).
+> `@nestjs/cli` handles this automatically — no extra setup needed.
+
 ## Key conventions
 - **One folder per module** in `src/modules/` — each has: `*.module.ts`, `*.controller.ts`, `*.service.ts`, `*.dto.ts`
 - **Named exports only** — no default exports anywhere
