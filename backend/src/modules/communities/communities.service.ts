@@ -52,7 +52,7 @@ export class CommunitiesService {
   }
 
   async create(userId: string, dto: CreateCommunityDto) {
-    return this.prisma.$transaction(async (tx: typeof this.prisma) => {
+    return (this.prisma as any).$transaction(async (tx: any) => {
       const community = await tx.community.create({
         data: {
           name: dto.name,
@@ -136,7 +136,7 @@ export class CommunitiesService {
     });
 
     const hasMore = items.length > limit;
-    const data = items.slice(0, limit).map((m: typeof items[number]) => ({
+    const data = items.slice(0, limit).map((m: any) => ({
       ...m.user,
       flair: m.flair,
       isChampion: m.isChampion,

@@ -90,7 +90,7 @@ export class AdminService {
 
     return this.prisma.report.update({
       where: { id },
-      data: { status: dto.status },
+      data: { status: dto.status as any },
     });
   }
 

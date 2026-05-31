@@ -1,5 +1,13 @@
 import { IsString, IsOptional, IsEnum } from "class-validator";
-import { NotificationType } from "@prisma/client";
+
+export enum NotificationTypeEnum {
+  LIKE = "LIKE",
+  FOLLOW = "FOLLOW",
+  REPLY = "REPLY",
+  REPOST = "REPOST",
+  QUOTE = "QUOTE",
+  MENTION = "MENTION",
+}
 
 export class CreateNotificationDto {
   @IsString()
@@ -8,8 +16,8 @@ export class CreateNotificationDto {
   @IsString()
   actorId: string;
 
-  @IsEnum(NotificationType)
-  type: NotificationType;
+  @IsEnum(NotificationTypeEnum)
+  type: NotificationTypeEnum;
 
   @IsString()
   entityId: string;

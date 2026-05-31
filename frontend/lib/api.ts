@@ -6,15 +6,24 @@
 // All requests include the JWT access token from localStorage
 // ─────────────────────────────────────────────
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
 
 /** Thin fetch wrapper that attaches auth header and parses JSON */
 async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+  // Read token from Zustand persisted store (key: "threads-auth")
+  let token: string | null = null;
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem("threads-auth");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        token = parsed?.state?.accessToken ?? null;
+      }
+    } catch {}
+  }
 
   const res = await fetch(`${BASE}${path}`, {
     ...options,

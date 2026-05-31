@@ -1,11 +1,10 @@
 import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
-import { NotificationType } from "@prisma/client";
 
 interface CreateNotificationData {
   recipientId: string;
   actorId: string;
-  type: NotificationType;
+  type: string;
   entityId: string;
   entityType: string;
   preview?: string;
@@ -20,7 +19,7 @@ export class NotificationsService {
       data: {
         recipientId: data.recipientId,
         actorId: data.actorId,
-        type: data.type,
+        type: data.type as any,
         entityId: data.entityId,
         entityType: data.entityType,
       },

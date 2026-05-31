@@ -17,7 +17,6 @@ import { ModerationService } from "./moderation.service";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RolesGuard } from "../../common/guards/roles.guard";
-import { Role } from "@prisma/client";
 import { CreateReportDto } from "./dto/moderation.dto";
 
 @ApiTags("moderation")
@@ -66,7 +65,7 @@ export class ModerationController {
 
   @Get("reports")
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles("ADMIN" as any)
   @ApiOperation({ summary: "List reports (admin only)" })
   getReports(
     @Query("cursor") cursor?: string,

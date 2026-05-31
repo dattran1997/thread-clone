@@ -50,25 +50,30 @@ npm run start:dev
 Copy `.env.example` to `.env` and fill in values.  
 `DATABASE_URL` must point to a running PostgreSQL instance.
 
-## Implemented modules (update as you build)
-- [ ] auth
-- [ ] users
-- [ ] threads
-- [ ] follows
-- [ ] feed
-- [ ] reactions
-- [ ] notifications
-- [ ] search
-- [ ] hashtags
-- [ ] mentions
-- [ ] messages
-- [ ] media
-- [ ] moderation
-- [ ] settings
-- [ ] communities
-- [ ] analytics
-- [ ] admin
-- [ ] health
+## Implemented modules ✅
+- [x] auth — register, login, refresh, logout (JWT rotation, bcrypt)
+- [x] users — profile CRUD, avatar, followers/following, username check, deactivation
+- [x] threads — CRUD, ghost (24h), polls, scheduling, drafts, 15-min edit, soft delete
+- [x] follows — follow/unfollow (privacy-aware), suggestions
+- [x] feed — for-you (popular) + following (reverse-chrono), cursor pagination
+- [x] reactions — like/unlike, repost/unrepost, save/unsave, quote, likes list
+- [x] notifications — CRUD, unread count, WebSocket gateway (Socket.io)
+- [x] search — users, threads, tags (case-insensitive contains)
+- [x] messages — DM conversations, send, start + WebSocket real-time
+- [x] media — file upload endpoint (local /uploads/; swap to MinIO in production)
+- [x] moderation — block/unblock, mute/unmute, reports
+- [x] settings — isPrivate, password change, email change
+- [x] communities — CRUD, join/leave, members list
+- [x] analytics — InsightsSummary, PerformanceChart, ThreadInsight
+- [x] admin — user search/suspend/unsuspend, reports queue, platform stats
+- [x] health — GET /health returns DB + service status
+
+## Next steps (production hardening)
+- Run `npx prisma migrate dev --name init` to create the database
+- Add BullMQ workers for notification fan-out, media processing, feed pre-computation
+- Wire MinIO for media storage (replace local uploads)
+- Add @nestjs/throttler rate limiting on auth endpoints
+- Add Redis adapter to Socket.io for multi-instance scaling
 
 ## Important files
 - `prisma/schema.prisma` — the ONLY place DB schema is defined

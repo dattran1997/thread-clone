@@ -15,13 +15,12 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { AdminService } from "./admin.service";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RolesGuard } from "../../common/guards/roles.guard";
-import { Role } from "@prisma/client";
 import { UpdateReportDto } from "./dto/admin.dto";
 
 @ApiTags("admin")
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
-@Roles(Role.ADMIN)
+@Roles("ADMIN" as any)
 @Controller("admin")
 export class AdminController {
   constructor(private adminService: AdminService) {}

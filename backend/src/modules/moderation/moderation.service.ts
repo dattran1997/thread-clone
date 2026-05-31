@@ -63,7 +63,7 @@ export class ModerationService {
       },
       orderBy: { createdAt: "desc" },
     });
-    return blocks.map((b) => b.blocked);
+    return blocks.map((b: typeof blocks[number]) => b.blocked);
   }
 
   // ── Mute ───────────────────────────────────────────────────────────────────

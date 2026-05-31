@@ -70,18 +70,34 @@ app/
   admin/              — admin panel (role-guarded)
 ```
 
-## Implemented modules (update as you build)
-- [ ] M16 Shell & Themes (layout, nav, toast, skeleton)
-- [ ] M01 Auth pages
-- [ ] M02 Profile page
-- [ ] M03 Thread composer + PostCard
-- [ ] M05 Feed page
-- [ ] M06 Reactions (like/repost/save/share)
-- [ ] M07 Thread detail + replies
-- [ ] M08 Activity page
-- [ ] M09 Search page
-- [ ] M10b Messages page
-- [ ] M13 Settings page
-- [ ] M17 Communities page
-- [ ] M18 Insights page
-- [ ] M14 Admin page
+## Implemented modules ✅
+- [x] M16 Shell & Themes — ThemeProvider (dark/light/warm), Logo, DesktopSidebar, MobileNav, RightPanel, WsProvider, ToastHost
+- [x] M01 Auth pages — login, register (JWT stored via Zustand persist)
+- [x] M02 Profile page — tabs (posts/replies/reposts), follow/unfollow, topics, links, notes, edit/share
+- [x] M03 Thread composer + PostCard — char ring SVG, ghost toggle, poll builder, double-tap heart, like/repost/save/share
+- [x] M05 Feed page — For You/Following tabs, 650ms skeleton, "See new posts" pill (5s idle), infinite scroll, empty states
+- [x] M06 Reactions — optimistic updates, bounce animation, repost context, save toast, share/copy link
+- [x] M07 Thread detail + replies — stats bar, reply composer, nested reply chain, showReplyLine
+- [x] M08 Activity page — filter tabs (all/mentions/follows), notification type badges, mark all read, unread dots
+- [x] M09 Search page — debounced 300ms, user/thread/tag type toggle, trending page when empty, clear button
+- [x] M10b Messages page — conversation list + chat view, optimistic send, Enter key, back nav
+- [x] M13 Settings page — theme toggle, privacy switch, password change, logout
+- [x] M17 Communities page — list + join/leave with optimistic count
+- [x] M18 Insights page — summary cards with deltas, bar chart, 7d/30d/90d range selector
+- [x] M14 Admin page — stats dashboard, user search/suspend, reports queue (approve/dismiss)
+
+## Key component files
+- `components/thread/PostCard.tsx` — main post card (all interactions)
+- `components/thread/Composer.tsx` — compose box (char ring, ghost, poll)
+- `components/shell/ThemeProvider.tsx` — apply theme to <html>
+- `components/shell/WsProvider.tsx` — Socket.io real-time events
+- `components/ui/Toast.tsx` — toast(message, type) singleton
+- `lib/api.ts` — fetch wrapper with JWT from Zustand store
+- `lib/ws.ts` — Socket.io singleton
+
+## Next steps (production hardening)
+- Create `.env.local` from `.env.local.example`
+- Add TanStack Query for caching + background refetch
+- Add pull-to-refresh on mobile feed
+- Add mention autocomplete in Composer
+- Add media upload UI (wire to POST /media/upload)
