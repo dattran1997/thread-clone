@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+/* ────────────────────────────────────────────
+   THEME TOKENS
+   Applied via data-theme attribute on <html>
+   Three themes: dark (default) · light · warm
+   ──────────────────────────────────────────── */
+
+:root,
+[data-theme="dark"] {
+  --bg:          #101010;
+  --bg2:         #1c1c1c;
+  --bg3:         #282828;
+  --text:        #f0f0f0;
+  --text2:       #888;
+  --text3:       #555;
+  --border:      #2e2e2e;
+  --accent:      #f0f0f0;
+  --accent-text: #101010;
+  --link:        #888;
+  --skeleton:    linear-gradient(90deg, #222 25%, #333 50%, #222 75%);
+  --toast-bg:    #f0f0f0;
+  --toast-fg:    #101010;
+  --bg-blur:     rgba(16, 16, 16, 0.85);
+}
+
+[data-theme="light"] {
+  --bg:          #ffffff;
+  --bg2:         #f2f2f2;
+  --bg3:         #e6e6e6;
+  --text:        #0d0d0d;
+  --text2:       #737373;
+  --text3:       #b0b0b0;
+  --border:      #e0e0e0;
+  --accent:      #0d0d0d;
+  --accent-text: #ffffff;
+  --link:        #737373;
+  --skeleton:    linear-gradient(90deg, #e6e6e6 25%, #d0d0d0 50%, #e6e6e6 75%);
+  --toast-bg:    #0d0d0d;
+  --toast-fg:    #ffffff;
+  --bg-blur:     rgba(255, 255, 255, 0.85);
+}
+
+[data-theme="warm"] {
+  --bg:          #fdf8f0;
+  --bg2:         #f2ebe0;
+  --bg3:         #e8ddd0;
+  --text:        #1c1309;
+  --text2:       #7a6a50;
+  --text3:       #b0a080;
+  --border:      #e0d4bc;
+  --accent:      #c05a10;
+  --accent-text: #ffffff;
+  --link:        #c05a10;
+  --skeleton:    linear-gradient(90deg, #e8ddd0 25%, #d8cdc0 50%, #e8ddd0 75%);
+  --toast-bg:    #1c1309;
+  --toast-fg:    #fdf8f0;
+  --bg-blur:     rgba(253, 248, 240, 0.85);
+}
+
+/* ────────────────────────────────────────────
+   BASE STYLES
+   ──────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background:              var(--bg);
+  color:                   var(--text);
+  font-family:             'Helvetica Neue', Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing:  antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a            { color: inherit; text-decoration: none; }
+button       { font-family: inherit; }
+textarea,
+input        { font-family: inherit; }
+::placeholder { color: var(--text3); }
+
+/* Hide scrollbars but keep functionality */
+::-webkit-scrollbar { width: 0; height: 0; }
+
+/* ────────────────────────────────────────────
+   KEYFRAME ANIMATIONS
+   (ported directly from design prototype)
+   ──────────────────────────────────────────── */
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes heartPop {
+  0%   { opacity: 1; transform: scale(0.3); }
+  50%  { transform: scale(1.2); }
+  80%  { transform: scale(0.95); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Skeleton shimmer utility */
+.skeleton {
+  background:      var(--skeleton);
+  background-size: 200% 100%;
+  animation:       shimmer 1.3s infinite linear;
+  border-radius:   6px;
+}

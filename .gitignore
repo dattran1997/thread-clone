@@ -1,0 +1,31 @@
+# Node
+node_modules/
+.npm
+
+# Next.js
+frontend/.next/
+frontend/out/
+frontend/.env.local
+
+# NestJS / Backend
+backend/dist/
+backend/.env
+backend/generated/
+
+# Prisma
+backend/prisma/migrations/
+
+# Environment files — never commit secrets
+*.env
+!*.env.example
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes (if local bind mounts)
+infra/data/

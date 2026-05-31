@@ -1,0 +1,427 @@
+// Prisma schema for Threads Clone
+// Run: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum FollowStatus {
+  PENDING
+  ACCEPTED
+}
+
+enum ThreadStatus {
+  ACTIVE
+  DELETED
+  GHOST_ARCHIVED
+}
+
+enum ReplyPermission {
+  EVERYONE
+  FOLLOWING
+  MENTIONED
+}
+
+enum NotificationType {
+  LIKE
+  FOLLOW
+  REPLY
+  REPOST
+  QUOTE
+  MENTION
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  ACTION_TAKEN
+  DISMISSED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+// ─────────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  username      String    @unique
+  displayName   String
+  passwordHash  String
+  bio           String?
+  avatarUrl     String?
+  notes         String?
+  isPrivate     Boolean   @default(false)
+  isVerified    Boolean   @default(false)
+  role          Role      @default(USER)
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  profile           UserProfile?
+  sessions          Session[]
+  threads           Thread[]
+  likes             ThreadLike[]
+  reposts           ThreadRepost[]
+  saves             ThreadSave[]
+  quotes            ThreadQuote[]
+  followers         Follow[]         @relation("following")
+  following         Follow[]         @relation("follower")
+  blocksInitiated   Block[]          @relation("blocker")
+  blocksReceived    Block[]          @relation("blocked")
+  mutesInitiated    Mute[]           @relation("muter")
+  mutesReceived     Mute[]           @relation("muted")
+  notificationsRcvd Notification[]   @relation("recipient")
+  notificationsSent Notification[]   @relation("actor")
+  reports           Report[]         @relation("reporter")
+  mentions          Mention[]
+  dmParticipants    DmParticipant[]
+  dmMessages        DmMessage[]
+  communityMembers  CommunityMember[]
+  pollVotes         PollVote[]
+
+  @@index([username])
+  @@index([email])
+}
+
+model UserProfile {
+  userId   String   @id
+  user     User     @relation(fields: [userId], references: [id])
+  links    String[]
+  topics   String[]
+  location String?
+}
+
+model Session {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  refreshTokenHash String
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────
+// SOCIAL GRAPH
+// ─────────────────────────────────────────────
+
+model Follow {
+  followerId  String
+  followingId String
+  follower    User         @relation("follower",  fields: [followerId],  references: [id])
+  following   User         @relation("following", fields: [followingId], references: [id])
+  status      FollowStatus @default(ACCEPTED)
+  createdAt   DateTime     @default(now())
+
+  @@id([followerId, followingId])
+  @@index([followingId])
+}
+
+model Block {
+  blockerId String
+  blockedId String
+  blocker   User     @relation("blocker", fields: [blockerId], references: [id])
+  blocked   User     @relation("blocked", fields: [blockedId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@id([blockerId, blockedId])
+}
+
+model Mute {
+  muterId   String
+  mutedId   String
+  muter     User     @relation("muter", fields: [muterId], references: [id])
+  muted     User     @relation("muted", fields: [mutedId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@id([muterId, mutedId])
+}
+
+// ─────────────────────────────────────────────
+// THREADS (POSTS)
+// ─────────────────────────────────────────────
+
+model Thread {
+  id              String          @id @default(cuid())
+  authorId        String
+  author          User            @relation(fields: [authorId], references: [id])
+  text            String          @db.VarChar(500)
+  parentId        String?
+  rootId          String?
+  parent          Thread?         @relation("replies", fields: [parentId], references: [id])
+  replies         Thread[]        @relation("replies")
+  status          ThreadStatus    @default(ACTIVE)
+  isGhost         Boolean         @default(false)
+  ghostExpiresAt  DateTime?
+  replyPermission ReplyPermission @default(EVERYONE)
+  requireApproval Boolean         @default(false)
+  isEdited        Boolean         @default(false)
+  editableUntil   DateTime?
+  scheduledAt     DateTime?
+  isDraft         Boolean         @default(false)
+  likeCount       Int             @default(0)
+  replyCount      Int             @default(0)
+  repostCount     Int             @default(0)
+  quoteCount      Int             @default(0)
+  viewCount       Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  media    ThreadMedia[]
+  likes    ThreadLike[]
+  reposts  ThreadRepost[]
+  saves    ThreadSave[]
+  quotes   ThreadQuote[]
+  hashtags ThreadHashtag[]
+  mentions Mention[]
+  poll     Poll?
+
+  @@index([authorId])
+  @@index([parentId])
+  @@index([rootId])
+  @@index([scheduledAt])
+  @@index([createdAt(sort: Desc)])
+}
+
+model ThreadMedia {
+  id       String    @id @default(cuid())
+  threadId String
+  thread   Thread    @relation(fields: [threadId], references: [id])
+  url      String
+  type     MediaType
+  altText  String?
+  order    Int
+  width    Int?
+  height   Int?
+
+  @@index([threadId])
+}
+
+model ThreadLike {
+  userId    String
+  threadId  String
+  user      User     @relation(fields: [userId],   references: [id])
+  thread    Thread   @relation(fields: [threadId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@id([userId, threadId])
+  @@index([threadId])
+}
+
+model ThreadRepost {
+  userId    String
+  threadId  String
+  user      User     @relation(fields: [userId],   references: [id])
+  thread    Thread   @relation(fields: [threadId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@id([userId, threadId])
+  @@index([threadId])
+}
+
+model ThreadSave {
+  userId    String
+  threadId  String
+  user      User     @relation(fields: [userId],   references: [id])
+  thread    Thread   @relation(fields: [threadId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@id([userId, threadId])
+}
+
+model ThreadQuote {
+  id        String   @id @default(cuid())
+  userId    String
+  threadId  String
+  quoteText String   @db.VarChar(500)
+  user      User     @relation(fields: [userId],   references: [id])
+  thread    Thread   @relation(fields: [threadId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([threadId])
+}
+
+// ─────────────────────────────────────────────
+// POLLS
+// ─────────────────────────────────────────────
+
+model Poll {
+  id        String       @id @default(cuid())
+  threadId  String       @unique
+  thread    Thread       @relation(fields: [threadId], references: [id])
+  options   PollOption[]
+  expiresAt DateTime
+  createdAt DateTime     @default(now())
+}
+
+model PollOption {
+  id        String     @id @default(cuid())
+  pollId    String
+  poll      Poll       @relation(fields: [pollId], references: [id])
+  text      String     @db.VarChar(25)
+  order     Int
+  voteCount Int        @default(0)
+  votes     PollVote[]
+}
+
+model PollVote {
+  userId       String
+  pollOptionId String
+  user         User       @relation(fields: [userId],       references: [id])
+  option       PollOption @relation(fields: [pollOptionId], references: [id])
+  createdAt    DateTime   @default(now())
+
+  @@id([userId, pollOptionId])
+}
+
+// ─────────────────────────────────────────────
+// HASHTAGS & MENTIONS
+// ─────────────────────────────────────────────
+
+model Hashtag {
+  id          String          @id @default(cuid())
+  tag         String          @unique
+  threadCount Int             @default(0)
+  threads     ThreadHashtag[]
+
+  @@index([tag])
+}
+
+model ThreadHashtag {
+  threadId  String
+  hashtagId String
+  thread    Thread  @relation(fields: [threadId],  references: [id])
+  hashtag   Hashtag @relation(fields: [hashtagId], references: [id])
+
+  @@id([threadId, hashtagId])
+}
+
+model Mention {
+  id              String @id @default(cuid())
+  threadId        String
+  mentionedUserId String
+  thread          Thread @relation(fields: [threadId],        references: [id])
+  mentionedUser   User   @relation(fields: [mentionedUserId], references: [id])
+
+  @@index([mentionedUserId])
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────
+
+model Notification {
+  id          String           @id @default(cuid())
+  recipientId String
+  actorId     String
+  recipient   User             @relation("recipient", fields: [recipientId], references: [id])
+  actor       User             @relation("actor",     fields: [actorId],     references: [id])
+  type        NotificationType
+  entityId    String
+  entityType  String
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@index([recipientId, readAt])
+  @@index([createdAt(sort: Desc)])
+}
+
+// ─────────────────────────────────────────────
+// DIRECT MESSAGES
+// ─────────────────────────────────────────────
+
+model DmConversation {
+  id           String          @id @default(cuid())
+  participants DmParticipant[]
+  messages     DmMessage[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model DmParticipant {
+  conversationId String
+  userId         String
+  conversation   DmConversation @relation(fields: [conversationId], references: [id])
+  user           User           @relation(fields: [userId],         references: [id])
+  unreadCount    Int            @default(0)
+
+  @@id([conversationId, userId])
+}
+
+model DmMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  senderId       String
+  conversation   DmConversation @relation(fields: [conversationId], references: [id])
+  sender         User           @relation(fields: [senderId],       references: [id])
+  text           String
+  createdAt      DateTime       @default(now())
+
+  @@index([conversationId, createdAt(sort: Desc)])
+}
+
+// ─────────────────────────────────────────────
+// MODERATION
+// ─────────────────────────────────────────────
+
+model Report {
+  id         String       @id @default(cuid())
+  reporterId String
+  reporter   User         @relation("reporter", fields: [reporterId], references: [id])
+  targetType String
+  targetId   String
+  reason     String
+  note       String?
+  status     ReportStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────
+// COMMUNITIES
+// ─────────────────────────────────────────────
+
+model Community {
+  id          String            @id @default(cuid())
+  name        String
+  description String?
+  avatarUrl   String?
+  memberCount Int               @default(0)
+  createdAt   DateTime          @default(now())
+  members     CommunityMember[]
+}
+
+model CommunityMember {
+  communityId String
+  userId      String
+  community   Community @relation(fields: [communityId], references: [id])
+  user        User      @relation(fields: [userId],      references: [id])
+  flair       String?
+  isChampion  Boolean   @default(false)
+  joinedAt    DateTime  @default(now())
+
+  @@id([communityId, userId])
+}
