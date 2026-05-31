@@ -41,6 +41,30 @@ thread-clone/
 Original design prototype: `https://api.anthropic.com/v1/design/h/aQGTYaE_NyXkT32phJ9YQQ`  
 Key file: `Threads Clone.html` — 7-component React prototype, pixel-perfect reference.
 
+## GitHub
+Repo: https://github.com/dattran1997/thread-clone  
+Branch strategy: `master` is always deployable. Feature work happens in `sprint-N` branches.
+
+## Sprint commit convention
+At the end of every sprint, create a commit + push to GitHub:
+```bash
+cd "C:\Users\dattr\OneDrive\Desktop\code\2026\thread-clone"
+
+# Stage all sprint changes
+git add -A
+
+# Commit with sprint label
+git commit -m "feat(sprint-N): <summary of what was built>"
+
+# Push
+git push origin master
+```
+
+**Commit message format**:
+- `feat(sprint-1): auth + users + frontend shell` — new module(s)
+- `fix(sprint-2): feed pagination cursor bug` — bug fix within a sprint
+- `chore(sprint-3): update PLAN.md module checklist` — docs/admin only
+
 ## Pending decisions (answer in PLAN.md when decided)
 - [ ] Decision B: Create a `shared/` folder for TypeScript types shared between frontend/backend?
 - [ ] Decision C: Confirmed lowercase folder names (frontend/ backend/) — good for Linux/Pi compatibility
