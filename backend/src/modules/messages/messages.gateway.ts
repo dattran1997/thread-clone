@@ -1,0 +1,87 @@
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  MessageBody,
+  ConnectedSocket,
+} from "@nestjs/websockets";
+import { Server, Socket } from "socket.io";
+import { JwtService } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
+import { Logger } from "@nestjs/common";
+import { MessagesService } from "./messages.service";
+
+@WebSocketGateway({ cors: { origin: "*" }, namespace: "/messages" })
+export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  @WebSocketServer()
+  server: Server;
+
+  private readonly logger = new Logger(MessagesGateway.name);
+
+  constructor(
+    private jwtService: JwtService,
+    private configService: ConfigService,
+    private messagesService: MessagesService,
+  ) {}
+
+  async handleConnection(socket: Socket) {
+    try {
+      const token = socket.handshake.auth?.token as string | undefined;
+      if (!token) {
+        socket.disconnect();
+        return;
+      }
+
+      const secret = this.configService.get<string>("jwt.accessSecret");
+      const payload = this.jwtService.verify(token, { secret });
+      socket.data.userId = payload.sub as string;
+      this.logger.log(`Messages: user ${socket.data.userId} connected`);
+    } catch {
+      socket.disconnect();
+    }
+  }
+
+  handleDisconnect(socket: Socket) {
+    this.logger.log(`Messages: socket ${socket.id} disconnected`);
+  }
+
+  @SubscribeMessage("join-conversation")
+  async handleJoin(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: { conversationId: string },
+  ) {
+    const userId = socket.data.userId as string;
+    const participants = await this.messagesService.getConversationParticipants(data.conversationId);
+    if (!participants.includes(userId)) {
+      socket.emit("error", { message: "Not a participant in this conversation" });
+      return;
+    }
+    await socket.join(`conv:${data.conversationId}`);
+    socket.emit("joined", { conversationId: data.conversationId });
+  }
+
+  @SubscribeMessage("send-message")
+  async handleSendMessage(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: { conversationId: string; text: string },
+  ) {
+    const senderId = socket.data.userId as string;
+    if (!data.conversationId || !data.text?.trim()) {
+      socket.emit("error", { message: "conversationId and text are required" });
+      return;
+    }
+
+    try {
+      const message = await this.messagesService.sendMessage(
+        data.conversationId,
+        senderId,
+        data.text,
+      );
+      this.server.to(`conv:${data.conversationId}`).emit("new-message", message);
+    } catch (err) {
+      socket.emit("error", { message: (err as Error).message });
+    }
+  }
+}

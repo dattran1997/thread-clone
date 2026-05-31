@@ -70,8 +70,12 @@ model User {
   bio           String?
   avatarUrl     String?
   notes         String?
+  links         String[]
+  topics        String[]
   isPrivate     Boolean   @default(false)
   isVerified    Boolean   @default(false)
+  isActive      Boolean   @default(true)
+  followerCount Int       @default(0)
   role          Role      @default(USER)
   emailVerified Boolean   @default(false)
   createdAt     DateTime  @default(now())
@@ -107,8 +111,6 @@ model User {
 model UserProfile {
   userId   String   @id
   user     User     @relation(fields: [userId], references: [id])
-  links    String[]
-  topics   String[]
   location String?
 }
 

@@ -1,22 +1,28 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { ThemeProvider } from "@/components/shell/ThemeProvider";
+import { ToastHost } from "@/components/ui/Toast";
 
 export const metadata: Metadata = {
-  title: "Threads",
+  title: { default: "Threads", template: "%s · Threads" },
   description: "A text-based social network",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export const viewport: Viewport = {
+  themeColor: "#101010",
+  width: "device-width",
+  initialScale: 1,
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // data-theme is applied client-side by ThemeProvider (see components/shell/)
-    // Default "dark" is set in globals.css :root so there's no flash on first load
+    // data-theme="dark" is the SSR default; ThemeProvider overrides it client-side
     <html lang="en" data-theme="dark">
-      <body className="min-h-full bg-[var(--bg)] text-[var(--text)] antialiased">
-        {children}
+      <body className="min-h-screen bg-[var(--bg)] text-[var(--text)] antialiased">
+        <ThemeProvider>
+          {children}
+          <ToastHost />
+        </ThemeProvider>
       </body>
     </html>
   );
