@@ -89,6 +89,6 @@ export class FollowsService {
     const follow = await this.prisma.follow.findUnique({
       where: { followerId_followingId: { followerId, followingId } },
     });
-    return { isFollowing: follow?.status === "ACCEPTED" ?? false };
+    return { isFollowing: follow?.status === "ACCEPTED" };
   }
 }
