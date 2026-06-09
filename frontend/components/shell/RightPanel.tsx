@@ -1,33 +1,39 @@
 import Link from "next/link";
+import { Search } from "lucide-react";
+
+const TRENDING = [
+  { tag: "design", count: "12.4K" },
+  { tag: "typescript", count: "8.1K" },
+  { tag: "nextjs", count: "6.9K" },
+  { tag: "threads", count: "5.2K" },
+  { tag: "ai", count: "3.8K" },
+];
 
 export function RightPanel() {
   return (
-    <aside className="w-[310px] flex flex-col gap-6 py-6 px-4">
+    <aside className="w-[310px] flex flex-col gap-6 py-6 px-6 sticky top-0 h-screen overflow-y-auto">
       {/* Search bar */}
       <Link
         href="/search"
-        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--bg2)] text-[var(--text2)] text-sm hover:bg-[var(--bg3)] transition-colors"
+        className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-[var(--bg2)] text-[var(--text2)] text-[15px] hover:bg-[var(--bg3)] transition-colors"
       >
-        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-          <circle cx={11} cy={11} r={8} /><path d="m21 21-4.35-4.35" />
-        </svg>
-        Search
+        <Search size={18} className="flex-shrink-0" />
+        <span>Search</span>
       </Link>
 
       {/* Trending widget */}
       <section>
-        <h3 className="font-semibold text-[var(--text)] mb-3 text-[15px]">Trending</h3>
-        <div className="space-y-3">
-          {["#design", "#typescript", "#nextjs", "#threads", "#ai"].map((tag, i) => (
+        <h3 className="text-[15px] text-[var(--text)] mb-4">Trending</h3>
+        <div className="flex flex-col gap-4">
+          {TRENDING.map((item, i) => (
             <Link
-              key={tag}
-              href={`/search?q=${encodeURIComponent(tag)}`}
-              className="flex items-start justify-between group"
+              key={item.tag}
+              href={`/search?q=${encodeURIComponent("#" + item.tag)}`}
+              className="flex flex-col hover:opacity-80 transition-opacity"
             >
-              <div>
-                <span className="text-xs text-[var(--text2)]">{i + 1} · Trending</span>
-                <p className="text-sm font-semibold text-[var(--text)] group-hover:underline">{tag}</p>
-              </div>
+              <span className="text-[13px] text-[var(--text2)]">{i + 1} · Trending</span>
+              <span className="text-[15px] text-[var(--text)] font-medium">#{item.tag}</span>
+              <span className="text-[13px] text-[var(--text2)]">{item.count} threads</span>
             </Link>
           ))}
         </div>
@@ -35,10 +41,13 @@ export function RightPanel() {
 
       {/* Suggested users widget */}
       <section>
-        <h3 className="font-semibold text-[var(--text)] mb-3 text-[15px]">Suggested for you</h3>
-        <p className="text-sm text-[var(--text2)]">Follow people to see their threads here.</p>
-        <Link href="/search" className="text-sm text-[var(--accent)] mt-2 inline-block font-medium hover:underline">
-          Find people
+        <h3 className="text-[15px] text-[var(--text)] mb-4">Suggested for you</h3>
+        <p className="text-[14px] text-[var(--text2)]">Follow people to see their threads here.</p>
+        <Link
+          href="/search"
+          className="text-[14px] text-[var(--text)] font-medium mt-2 inline-block hover:underline"
+        >
+          Find people →
         </Link>
       </section>
     </aside>

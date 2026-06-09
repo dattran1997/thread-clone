@@ -5,9 +5,7 @@ import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useNotificationStore } from "@/stores/notifications";
 import { useComposeStore } from "@/stores/compose";
-import {
-  HomeIcon, SearchIcon, ComposeIcon, BellIcon, MessageIcon,
-} from "@/components/ui/Icons";
+import { Home, Search, Bell, Mail, PlusCircle } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 
 export function MobileNav() {
@@ -17,71 +15,77 @@ export function MobileNav() {
   const unreadMessages = useNotificationStore((s) => s.unreadMessages);
   const openCompose = useComposeStore((s) => s.open);
 
-  const linkItems = [
-    { href: "/", label: "Home", icon: <HomeIcon size={24} /> },
-    { href: "/search", label: "Search", icon: <SearchIcon size={24} /> },
-    { href: "/activity", label: "Activity", icon: <BellIcon size={24} />, badge: unreadNotifications },
-    { href: "/messages", label: "Messages", icon: <MessageIcon size={24} />, badge: unreadMessages },
-  ];
+  const isActive = (href: string) =>
+    href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-2 pb-safe bg-[var(--bg-blur)] backdrop-blur-md border-t border-[var(--border)]"
-      style={{ height: 60 }}
+      className="fixed bottom-0 left-0 right-0 z-40 flex h-14 items-center justify-around px-4 bg-[var(--bg-blur)] backdrop-blur-xl border-t border-[var(--border)]"
     >
       {/* Home */}
-      {linkItems.slice(0, 2).map((item) => {
-        const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-label={item.label}
-            className={cn(
-              "relative flex items-center justify-center w-12 h-12 rounded-xl transition-colors",
-              active ? "text-[var(--text)]" : "text-[var(--text2)]",
-            )}
-          >
-            {item.icon}
-          </Link>
-        );
-      })}
+      <Link
+        href="/"
+        aria-label="Home"
+        className={cn(
+          "flex items-center justify-center w-12 h-12 transition-colors",
+          isActive("/") ? "text-[var(--text)]" : "text-[var(--text2)]",
+        )}
+      >
+        <Home size={26} />
+      </Link>
 
-      {/* Compose button (middle) */}
+      {/* Search */}
+      <Link
+        href="/search"
+        aria-label="Search"
+        className={cn(
+          "flex items-center justify-center w-12 h-12 transition-colors",
+          isActive("/search") ? "text-[var(--text)]" : "text-[var(--text2)]",
+        )}
+      >
+        <Search size={26} />
+      </Link>
+
+      {/* Compose (center) */}
       <button
         onClick={() => openCompose()}
         aria-label="New thread"
-        className="relative flex items-center justify-center w-12 h-12 rounded-xl text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+        className="flex items-center justify-center w-12 h-12 text-[var(--text)] transition-colors"
       >
-        <ComposeIcon size={26} />
+        <PlusCircle size={32} />
       </button>
 
-      {/* Activity + Messages */}
-      {linkItems.slice(2).map((item) => {
-        const active = pathname === item.href || pathname.startsWith(item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-label={item.label}
-            className={cn(
-              "relative flex items-center justify-center w-12 h-12 rounded-xl transition-colors",
-              active ? "text-[var(--text)]" : "text-[var(--text2)]",
-            )}
-          >
-            {item.icon}
-            {item.badge && item.badge > 0 ? (
-              <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 text-[10px] font-bold bg-red-500 text-white rounded-full flex items-center justify-center">
-                {item.badge > 99 ? "99+" : item.badge}
-              </span>
-            ) : null}
-          </Link>
-        );
-      })}
+      {/* Activity */}
+      <Link
+        href="/activity"
+        aria-label="Activity"
+        className={cn(
+          "relative flex items-center justify-center w-12 h-12 transition-colors",
+          isActive("/activity") ? "text-[var(--text)]" : "text-[var(--text2)]",
+        )}
+      >
+        <Bell size={26} />
+        {unreadNotifications > 0 && (
+          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500" />
+        )}
+      </Link>
 
-      {/* Profile avatar */}
-      <Link href={user ? `/${user.username}` : "/login"} aria-label="Profile">
-        <Avatar src={user?.avatarUrl} alt={user?.displayName ?? "Profile"} size={28} />
+      {/* Profile */}
+      <Link
+        href={user ? `/${user.username}` : "/login"}
+        aria-label="Profile"
+        className={cn(
+          "flex items-center justify-center w-12 h-12 transition-colors",
+          isActive(user ? `/${user.username}` : "/login")
+            ? "text-[var(--text)]"
+            : "text-[var(--text2)]",
+        )}
+      >
+        {user?.avatarUrl ? (
+          <Avatar src={user.avatarUrl} alt={user.displayName} size={26} />
+        ) : (
+          <Avatar src={null} alt="Profile" size={26} />
+        )}
       </Link>
     </nav>
   );

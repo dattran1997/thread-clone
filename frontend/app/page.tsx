@@ -83,19 +83,22 @@ export default function HomePage() {
         <DesktopSidebar />
       </div>
 
-      <main className="flex-1 max-w-[622px] w-full mx-auto border-r border-[var(--border)] min-h-screen pb-20 lg:pb-0">
-        <div className="lg:hidden sticky top-0 z-30 flex items-center justify-center py-3 border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-md">
+      <main className="flex-1 max-w-[622px] w-full mx-auto border-r border-[var(--border)] min-h-screen pb-14 lg:pb-0">
+        <div className="lg:hidden sticky top-0 z-30 h-14 flex items-center justify-center border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-xl">
           <Logo size={28} />
         </div>
 
-        <div className="sticky top-[52px] lg:top-0 z-20 flex border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-md">
+        <div className="sticky top-14 lg:top-0 z-20 flex border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-xl">
           {(["for-you", "following"] as FeedTab[]).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={cn(
-                "flex-1 py-3 text-sm font-medium transition-colors border-b-2",
-                tab === t ? "border-[var(--accent)] text-[var(--text)]" : "border-transparent text-[var(--text2)] hover:text-[var(--text)]",
+                "relative flex-1 py-4 text-[15px] font-medium transition-colors",
+                tab === t ? "text-[var(--text)]" : "text-[var(--text2)] hover:text-[var(--text)]",
               )}>
               {t === "for-you" ? "For you" : "Following"}
+              {tab === t && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--text)] rounded-full" />
+              )}
             </button>
           ))}
         </div>
@@ -118,13 +121,22 @@ export default function HomePage() {
         {loading && threads.length === 0 && isAuthenticated ? (
           [...Array(5)].map((_, i) => <PostCardSkeleton key={i} />)
         ) : !isAuthenticated ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center px-6 gap-4">
-            <Logo size={48} />
-            <h1 className="text-2xl font-bold text-[var(--text)]">Welcome to Threads</h1>
-            <p className="text-[var(--text2)]">Sign in to see your feed and post threads.</p>
-            <a href="/login" className="px-6 py-3 rounded-xl bg-[var(--accent)] text-[var(--accent-text)] font-semibold hover:opacity-90">
-              Log in
-            </a>
+          <div className="flex flex-col items-center justify-center py-24 text-center px-6 gap-5">
+            <Logo size={56} />
+            <div>
+              <h1 className="text-[26px] font-bold text-[var(--text)] mb-2">Welcome to Threads</h1>
+              <p className="text-[15px] text-[var(--text2)]">Sign in to see your feed and post threads.</p>
+            </div>
+            <div className="flex flex-col gap-2 w-full max-w-[320px] mt-2">
+              <a href="/login"
+                className="w-full py-4 rounded-xl bg-[var(--accent)] text-[var(--accent-text)] font-bold text-[15px] text-center hover:opacity-90 transition-opacity">
+                Log in
+              </a>
+              <a href="/register"
+                className="w-full py-4 rounded-xl border border-[var(--border)] text-[var(--text)] font-semibold text-[15px] text-center hover:bg-[var(--hover-overlay)] transition-colors">
+                Create account
+              </a>
+            </div>
           </div>
         ) : threads.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center px-6">

@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
@@ -35,6 +36,14 @@ const PILL_TYPE: Record<FilterPill, string> = {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen bg-[var(--bg)]" />}>
+      <SearchPageInner />
+    </Suspense>
+  );
+}
+
+function SearchPageInner() {
   const params = useSearchParams();
   const [query, setQuery] = useState(params.get("q") ?? "");
   const [pill, setPill] = useState<FilterPill>("All");
@@ -109,7 +118,7 @@ export default function SearchPage() {
         <DesktopSidebar />
       </div>
 
-      <main className="flex-1 max-w-[622px] w-full mx-auto border-r border-[var(--border)] min-h-screen pb-20 lg:pb-0">
+      <main className="flex-1 max-w-[622px] w-full mx-auto border-r border-[var(--border)] min-h-screen pb-14 lg:pb-0">
         {/* ── Sticky search bar + pills ── */}
         <div className="sticky top-0 z-20 bg-[var(--bg-blur)] backdrop-blur-md border-b border-[var(--border)]">
           <div className="px-4 pt-3 pb-2">
@@ -139,10 +148,10 @@ export default function SearchPage() {
                 key={p}
                 onClick={() => setPill(p)}
                 className={cn(
-                  "whitespace-nowrap rounded-full border px-5 py-1.5 text-[14px] font-medium transition-colors shrink-0",
+                  "whitespace-nowrap rounded-full px-5 py-2 text-[14px] font-medium transition-colors shrink-0 border",
                   pill === p
-                    ? "bg-[var(--accent)] border-[var(--accent)] text-[var(--accent-text)]"
-                    : "border-[var(--border)] text-[var(--text)] hover:bg-[var(--bg2)]",
+                    ? "bg-[var(--text)] border-[var(--text)] text-[var(--bg)]"
+                    : "border-[var(--border)] text-[var(--text)] hover:bg-[var(--hover-overlay)]",
                 )}
               >
                 {p}

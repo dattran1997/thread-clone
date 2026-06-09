@@ -80,7 +80,7 @@ export default function ActivityPage() {
         <DesktopSidebar />
       </div>
 
-      <main className="flex-1 max-w-[622px] mx-auto border-r border-[var(--border)] min-h-screen pb-20 lg:pb-0">
+      <main className="flex-1 max-w-[622px] mx-auto border-r border-[var(--border)] min-h-screen pb-14 lg:pb-0">
         {/* Header */}
         <div className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-md">
           <div className="flex items-center justify-between px-4 pt-4 pb-3">
@@ -109,13 +109,16 @@ export default function ActivityPage() {
                 key={f}
                 onClick={() => setFilter(f)}
                 className={cn(
-                  "flex-1 py-2.5 text-[14px] font-medium capitalize transition-colors border-b-2",
+                  "relative flex-1 py-4 text-[15px] font-medium capitalize transition-colors",
                   filter === f
-                    ? "border-[var(--accent)] text-[var(--text)]"
-                    : "border-transparent text-[var(--text2)] hover:text-[var(--text)]",
+                    ? "text-[var(--text)]"
+                    : "text-[var(--text2)] hover:text-[var(--text)]",
                 )}
               >
                 {f}
+                {filter === f && (
+                  <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--text)] rounded-full" />
+                )}
               </button>
             ))}
           </div>

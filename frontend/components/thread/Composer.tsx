@@ -69,13 +69,16 @@ export function Composer({ parentId, onSuccess, placeholder, autoFocus = false }
   }
 
   return (
-    <div className="flex gap-3 p-4">
-      {/* Avatar */}
-      <Avatar src={user.avatarUrl} alt={user.displayName} size={36} className="flex-shrink-0" />
+    <div className="flex gap-4 px-4 py-4">
+      {/* Avatar + thread line */}
+      <div className="flex flex-col items-center gap-2">
+        <Avatar src={user.avatarUrl} alt={user.displayName} size={40} className="flex-shrink-0" />
+        <div className="w-0.5 grow bg-[var(--border)] rounded-full min-h-[20px]" />
+      </div>
 
       {/* Input area */}
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-[var(--text)] mb-1">
+      <div className="flex-1 min-w-0 pb-2">
+        <div className="text-[15px] font-medium text-[var(--text)] mb-1">
           {user.username}
         </div>
         <textarea
@@ -83,11 +86,11 @@ export function Composer({ parentId, onSuccess, placeholder, autoFocus = false }
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder ?? (parentId ? "Reply to thread…" : "What's on your mind?")}
+          placeholder={placeholder ?? (parentId ? "Reply to thread…" : "What's new?")}
           autoFocus={autoFocus}
-          rows={3}
+          rows={parentId ? 2 : 1}
           className={cn(
-            "w-full bg-transparent text-sm text-[var(--text)] placeholder:text-[var(--text3)]",
+            "w-full bg-transparent text-[15px] text-[var(--text)] placeholder:text-[var(--text2)]",
             "resize-none outline-none leading-relaxed",
           )}
         />
@@ -176,7 +179,7 @@ export function Composer({ parentId, onSuccess, placeholder, autoFocus = false }
             <button
               onClick={handlePost}
               disabled={overLimit || loading || (!text.trim() && !showPoll)}
-              className="px-4 py-1.5 rounded-full bg-[var(--accent)] text-[var(--accent-text)] text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40"
+              className="px-4 py-1 h-8 rounded-full bg-[var(--accent)] text-[var(--accent-text)] text-[13px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40"
             >
               {loading ? "Posting…" : "Post"}
             </button>

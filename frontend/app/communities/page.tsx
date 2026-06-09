@@ -47,7 +47,7 @@ export default function CommunitiesPage() {
         <DesktopSidebar />
       </div>
 
-      <main className="flex-1 max-w-[622px] mx-auto border-r border-[var(--border)] min-h-screen pb-20 lg:pb-0">
+      <main className="flex-1 max-w-[622px] mx-auto border-r border-[var(--border)] min-h-screen pb-14 lg:pb-0">
         <div className="sticky top-0 z-20 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-md">
           <h1 className="text-xl font-bold text-[var(--text)]">Communities</h1>
         </div>

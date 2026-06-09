@@ -721,7 +721,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
       <div className="hidden lg:flex flex-col h-screen sticky top-0 border-r border-[var(--border)]">
         <DesktopSidebar />
       </div>
-      <main className="flex-1 max-w-[622px] w-full mx-auto border-r border-[var(--border)] min-h-screen pb-20 lg:pb-0">
+      <main className="flex-1 max-w-[622px] w-full mx-auto border-r border-[var(--border)] min-h-screen pb-14 lg:pb-0">
         {children}
       </main>
       <div className="lg:hidden"><MobileNav /></div>

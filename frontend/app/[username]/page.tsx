@@ -95,7 +95,7 @@ export default function ProfilePage() {
         <DesktopSidebar />
       </div>
 
-      <main className="flex-1 max-w-[622px] mx-auto border-r border-[var(--border)] min-h-screen pb-20 lg:pb-0">
+      <main className="flex-1 max-w-[622px] mx-auto border-r border-[var(--border)] min-h-screen pb-14 lg:pb-0">
         {/* Header */}
         <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3 bg-[var(--bg-blur)] backdrop-blur-md border-b border-[var(--border)]">
           <button onClick={() => router.back()} className="p-1 text-[var(--text2)] hover:text-[var(--text)]">
@@ -105,68 +105,72 @@ export default function ProfilePage() {
         </div>
 
         {/* Profile info */}
-        <div className="px-4 py-5">
-          <div className="flex items-start justify-between mb-4">
-            <div>
+        <div className="px-6 py-6">
+          <div className="flex items-start justify-between">
+            <div className="flex flex-col gap-1">
               <div className="flex items-center gap-1.5">
-                <h1 className="text-2xl font-bold text-[var(--text)]">{profile.displayName}</h1>
+                <h1 className="text-[24px] font-bold text-[var(--text)]">{profile.displayName}</h1>
                 {profile.isVerified && (
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-label="Verified">
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-label="Verified">
                     <circle cx="10" cy="10" r="10" fill="#0095F6"/>
                     <path d="M6 10l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 )}
               </div>
-              <p className="text-[var(--text2)] text-sm">@{profile.username}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-[14px] text-[var(--text2)]">@{profile.username}</p>
+                <span className="rounded-full bg-[var(--bg2)] px-2 py-0.5 text-[11px] text-[var(--text2)]">threads.net</span>
+              </div>
             </div>
-            <Avatar src={profile.avatarUrl} alt={profile.displayName} size={72} />
+            <Avatar src={profile.avatarUrl} alt={profile.displayName} size={84} />
           </div>
 
           {profile.notes && (
-            <p className="text-sm text-[var(--text2)] mb-3 italic">{profile.notes}</p>
+            <p className="text-[15px] text-[var(--text2)] mt-4 italic">{profile.notes}</p>
           )}
 
-          {profile.bio && <p className="text-sm text-[var(--text)] mb-3">{profile.bio}</p>}
+          {profile.bio && <p className="text-[15px] text-[var(--text)] mt-4 leading-relaxed">{profile.bio}</p>}
 
-          {profile.links.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-3">
-              {profile.links.map((link) => (
-                <a key={link} href={link} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-blue-400 hover:underline">
-                  <LinkIcon size={12} /> {link.replace(/^https?:\/\//, "").split("/")[0]}
-                </a>
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-center gap-4 text-sm text-[var(--text2)] mb-4">
+          <div className="flex items-center gap-3 mt-4 text-[14px] text-[var(--text2)]">
             <span><strong className="text-[var(--text)]">{profile.followerCount}</strong> followers</span>
+            <span className="text-[var(--text3)]">·</span>
             <span><strong className="text-[var(--text)]">{profile.followingCount}</strong> following</span>
           </div>
 
           {/* Topics */}
           {profile.topics.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-4">
+            <div className="flex flex-wrap gap-2 mt-4">
               {profile.topics.map((t) => (
                 <Link key={t} href={`/search?q=${encodeURIComponent(t)}`}
-                  className="px-3 py-1 rounded-full bg-[var(--bg2)] text-xs text-[var(--text2)] hover:bg-[var(--bg3)] transition-colors">
+                  className="px-3 py-1 rounded-full bg-[var(--bg2)] text-[13px] text-[var(--text2)] hover:bg-[var(--bg3)] transition-colors">
                   {t}
                 </Link>
               ))}
             </div>
           )}
 
+          {profile.links.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {profile.links.map((link) => (
+                <a key={link} href={link} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[13px] text-blue-400 hover:underline">
+                  <LinkIcon size={12} /> {link.replace(/^https?:\/\//, "").split("/")[0]}
+                </a>
+              ))}
+            </div>
+          )}
+
           {/* Action buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 mt-5">
             {isOwn ? (
               <>
                 <Link href="/settings"
-                  className="flex-1 py-2 text-center rounded-xl border border-[var(--border)] text-sm font-medium hover:bg-[var(--bg2)] transition-colors">
+                  className="flex-1 py-3 text-center rounded-xl border border-[var(--border)] text-[15px] font-semibold hover:bg-[var(--hover-overlay)] transition-colors">
                   Edit profile
                 </Link>
                 <button
                   onClick={() => { navigator.clipboard.writeText(window.location.href); toast("Link copied"); }}
-                  className="flex-1 py-2 rounded-xl border border-[var(--border)] text-sm font-medium hover:bg-[var(--bg2)] transition-colors">
+                  className="flex-1 py-3 rounded-xl border border-[var(--border)] text-[15px] font-semibold hover:bg-[var(--hover-overlay)] transition-colors">
                   Share profile
                 </button>
               </>
@@ -175,15 +179,15 @@ export default function ProfilePage() {
                 <button
                   onClick={toggleFollow}
                   className={cn(
-                    "flex-1 py-2 rounded-xl text-sm font-semibold transition-colors",
+                    "flex-1 py-3 rounded-xl text-[15px] font-semibold transition-colors",
                     following
-                      ? "border border-[var(--border)] text-[var(--text)] hover:bg-[var(--bg2)]"
+                      ? "border border-[var(--border)] text-[var(--text)] hover:bg-[var(--hover-overlay)]"
                       : "bg-[var(--accent)] text-[var(--accent-text)] hover:opacity-90",
                   )}>
                   {following ? "Following" : "Follow"}
                 </button>
                 <Link href={`/messages?user=${profile.id}`}
-                  className="flex-1 py-2 text-center rounded-xl border border-[var(--border)] text-sm font-medium hover:bg-[var(--bg2)] transition-colors">
+                  className="flex-1 py-3 text-center rounded-xl border border-[var(--border)] text-[15px] font-semibold hover:bg-[var(--hover-overlay)] transition-colors">
                   Message
                 </Link>
               </>
@@ -196,12 +200,15 @@ export default function ProfilePage() {
           {(["posts", "replies", "reposts"] as ProfileTab[]).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={cn(
-                "flex-1 py-3 text-sm font-medium capitalize transition-colors border-b-2",
+                "relative flex-1 py-4 text-[15px] font-medium capitalize transition-colors",
                 tab === t
-                  ? "border-[var(--accent)] text-[var(--text)]"
-                  : "border-transparent text-[var(--text2)] hover:text-[var(--text)]",
+                  ? "text-[var(--text)]"
+                  : "text-[var(--text2)] hover:text-[var(--text)]",
               )}>
               {t}
+              {tab === t && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--text)] rounded-full" />
+              )}
             </button>
           ))}
         </div>

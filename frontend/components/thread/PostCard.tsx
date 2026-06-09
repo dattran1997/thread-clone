@@ -255,7 +255,7 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
     <>
       <article
         onDoubleClick={handleDoubleTap}
-        className="relative flex gap-3 px-4 py-4 border-b border-[var(--border)] cursor-pointer hover:bg-white/[0.02] transition-colors group"
+        className="relative flex gap-3 px-4 py-3 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--hover-overlay)] transition-colors group"
         onClick={() => router.push(`/threads/${thread.id}`)}
       >
         {/* Heart burst */}
