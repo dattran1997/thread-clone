@@ -31,21 +31,26 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="w-full max-w-sm space-y-6">
-      <div className="flex flex-col items-center gap-3">
-        <Logo size={40} />
-        <h1 className="text-2xl font-bold text-[var(--text)]">Log in to Threads</h1>
-      </div>
+    <div className="w-full max-w-[400px] flex flex-col items-center gap-6 px-4">
+      {/* Logo */}
+      <Logo size={60} />
 
-      <form onSubmit={handleSubmit} className="space-y-3">
+      {/* Heading */}
+      <h1 className="text-[26px] font-bold text-white tracking-tight text-center">
+        Log in to Threads
+      </h1>
+
+      {/* Inputs */}
+      <form onSubmit={handleSubmit} className="w-full flex flex-col gap-2">
         <input
           type="email"
-          placeholder="Email"
+          placeholder="Email address"
           required
           autoComplete="email"
+          autoFocus
           value={form.email}
           onChange={(e) => setForm({ ...form, email: e.target.value })}
-          className="w-full px-4 py-3 rounded-xl bg-[var(--bg2)] border border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text2)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-sm"
+          className="w-full px-4 py-4 rounded-xl bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] text-white placeholder:text-[#666] text-[15px] focus:outline-none focus:border-[rgba(255,255,255,0.4)] transition-colors"
         />
         <input
           type="password"
@@ -54,22 +59,36 @@ export default function LoginPage() {
           autoComplete="current-password"
           value={form.password}
           onChange={(e) => setForm({ ...form, password: e.target.value })}
-          className="w-full px-4 py-3 rounded-xl bg-[var(--bg2)] border border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text2)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-sm"
+          className="w-full px-4 py-4 rounded-xl bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] text-white placeholder:text-[#666] text-[15px] focus:outline-none focus:border-[rgba(255,255,255,0.4)] transition-colors"
         />
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3 rounded-xl bg-[var(--accent)] text-[var(--accent-text)] font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+          className="w-full py-4 mt-1 rounded-xl bg-white text-black font-bold text-[15px] hover:bg-[#e8e8e8] active:bg-[#d0d0d0] transition-colors disabled:opacity-40"
         >
           {loading ? "Logging in…" : "Log in"}
         </button>
       </form>
 
-      <p className="text-center text-sm text-[var(--text2)]">
-        Don&apos;t have an account?{" "}
-        <Link href="/register" className="text-[var(--accent)] font-medium hover:underline">
-          Sign up
-        </Link>
+      {/* Divider */}
+      <div className="w-full flex items-center gap-3">
+        <div className="flex-1 h-px bg-[rgba(255,255,255,0.12)]" />
+        <span className="text-[13px] text-[#666] font-medium">OR</span>
+        <div className="flex-1 h-px bg-[rgba(255,255,255,0.12)]" />
+      </div>
+
+      {/* Create account box — matches real Threads */}
+      <Link
+        href="/register"
+        className="w-full py-4 rounded-xl border border-[rgba(255,255,255,0.15)] text-center text-[15px] font-semibold text-white hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+      >
+        Create new account
+      </Link>
+
+      <p className="text-[12px] text-[#555] text-center leading-relaxed pb-4">
+        By logging in, you agree to our{" "}
+        <span className="underline cursor-pointer">Terms</span> and{" "}
+        <span className="underline cursor-pointer">Privacy Policy</span>.
       </p>
     </div>
   );

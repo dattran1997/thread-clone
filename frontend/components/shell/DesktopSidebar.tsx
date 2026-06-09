@@ -1,19 +1,20 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useNotificationStore } from "@/stores/notifications";
+import { useComposeStore } from "@/stores/compose";
 import { Logo } from "./Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import {
-  HomeIcon, SearchIcon, BellIcon, MessageIcon, ComposeIcon, UserIcon, SettingsIcon,
+  HomeIcon, SearchIcon, BellIcon, MessageIcon, UserIcon, SettingsIcon,
 } from "@/components/ui/Icons";
 
 export function DesktopSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const openCompose = useComposeStore((s) => s.open);
   const unreadNotifications = useNotificationStore((s) => s.unreadCount);
   const unreadMessages = useNotificationStore((s) => s.unreadMessages);
 
@@ -61,7 +62,7 @@ export function DesktopSidebar() {
 
       {/* New Thread CTA */}
       <button
-        onClick={() => router.push("/compose")}
+        onClick={() => openCompose()}
         className="mx-3 mt-4 px-4 py-3 rounded-xl bg-[var(--accent)] text-[var(--accent-text)] font-semibold text-[15px] hover:opacity-90 transition-opacity"
       >
         New thread

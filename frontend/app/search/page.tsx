@@ -1,117 +1,175 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
 import { PostCard, Thread } from "@/components/thread/PostCard";
 import { DesktopSidebar } from "@/components/shell/DesktopSidebar";
+import { RightPanel } from "@/components/shell/RightPanel";
 import { MobileNav } from "@/components/shell/MobileNav";
-import { BackIcon, CloseIcon, SearchIcon } from "@/components/ui/Icons";
-import { cn } from "@/lib/utils";
+import { CloseIcon, SearchIcon } from "@/components/ui/Icons";
+import { fmtN, cn } from "@/lib/utils";
 import Link from "next/link";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface UserResult {
   id: string; username: string; displayName: string;
   avatarUrl: string | null; isVerified: boolean; followerCount?: number;
 }
 
-const TRENDING = [
-  { rank: 1, topic: "#design", count: "12.4K" },
-  { rank: 2, topic: "#typescript", count: "8.1K" },
-  { rank: 3, topic: "#nextjs", count: "6.9K" },
-  { rank: 4, topic: "#threads", count: "5.2K" },
-  { rank: 5, topic: "#opensource", count: "4.7K" },
-  { rank: 6, topic: "#ai", count: "3.8K" },
-  { rank: 7, topic: "#webdev", count: "3.1K" },
-];
+interface TrendingTag { id: string; tag: string; threadCount: number; }
 
+type FilterPill = "All" | "People" | "Threads" | "Tags" | "Media";
+
+const PILLS: FilterPill[] = ["All", "People", "Threads", "Tags", "Media"];
+
+// map pill → API type param
+const PILL_TYPE: Record<FilterPill, string> = {
+  All: "users",
+  People: "users",
+  Threads: "threads",
+  Tags: "tags",
+  Media: "threads",
+};
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function SearchPage() {
-  const router = useRouter();
   const params = useSearchParams();
   const [query, setQuery] = useState(params.get("q") ?? "");
-  const [type, setType] = useState<"users" | "threads" | "tags">("users");
+  const [pill, setPill] = useState<FilterPill>("All");
   const [userResults, setUserResults] = useState<UserResult[]>([]);
   const [threadResults, setThreadResults] = useState<Thread[]>([]);
+  const [tagResults, setTagResults] = useState<TrendingTag[]>([]);
+  const [trendingTags, setTrendingTags] = useState<TrendingTag[]>([]);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Load trending hashtags (shown when query is empty)
+  useEffect(() => {
+    api.get<TrendingTag[]>("/hashtags/trending?limit=10")
+      .then(setTrendingTags)
+      .catch(() =>
+        setTrendingTags([
+          { id: "1", tag: "design", threadCount: 12400 },
+          { id: "2", tag: "typescript", threadCount: 8100 },
+          { id: "3", tag: "nextjs", threadCount: 6900 },
+          { id: "4", tag: "threads", threadCount: 5200 },
+          { id: "5", tag: "opensource", threadCount: 4700 },
+          { id: "6", tag: "ai", threadCount: 3800 },
+          { id: "7", tag: "webdev", threadCount: 3100 },
+        ]),
+      );
+  }, []);
+
   useEffect(() => { inputRef.current?.focus(); }, []);
 
   useEffect(() => {
-    if (!query.trim()) { setUserResults([]); setThreadResults([]); return; }
-    debounceRef.current && clearTimeout(debounceRef.current);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim()) {
+      setUserResults([]); setThreadResults([]); setTagResults([]);
+      return;
+    }
+
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
+      const type = PILL_TYPE[pill];
       try {
-        const res = await api.get<{ data: any[] }>(`/search?q=${encodeURIComponent(query)}&type=${type}`);
-        if (type === "users") setUserResults(res.data as UserResult[]);
-        else setThreadResults(res.data as Thread[]);
+        if (pill === "All" || pill === "People") {
+          const res = await api.get<{ data: UserResult[] }>(`/search?q=${encodeURIComponent(query)}&type=users`);
+          setUserResults(res.data);
+        }
+        if (pill === "All" || pill === "Threads" || pill === "Media") {
+          const res = await api.get<{ data: Thread[] }>(`/search?q=${encodeURIComponent(query)}&type=threads`);
+          setThreadResults(res.data);
+        }
+        if (pill === "Tags") {
+          const res = await api.get<{ data: TrendingTag[] }>(`/search?q=${encodeURIComponent(query)}&type=tags`);
+          setTagResults(res.data);
+        }
       } catch {} finally { setLoading(false); }
     }, 300);
-  }, [query, type]);
+
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, pill]);
+
+  const noResults =
+    !loading &&
+    query.trim() &&
+    userResults.length === 0 &&
+    threadResults.length === 0 &&
+    tagResults.length === 0;
 
   return (
     <div className="flex min-h-screen">
+      {/* Desktop sidebar */}
       <div className="hidden lg:flex flex-col h-screen sticky top-0 border-r border-[var(--border)]">
         <DesktopSidebar />
       </div>
 
-      <main className="flex-1 max-w-[622px] mx-auto border-r border-[var(--border)] min-h-screen pb-20 lg:pb-0">
-        {/* Search bar */}
-        <div className="sticky top-0 z-20 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-md">
-          <div className="flex items-center gap-2">
-            <button onClick={() => router.back()} className="p-1 text-[var(--text2)] lg:hidden">
-              <BackIcon size={20} />
-            </button>
-            <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg2)]">
-              <SearchIcon size={16} className="text-[var(--text2)] flex-shrink-0" />
+      <main className="flex-1 max-w-[622px] w-full mx-auto border-r border-[var(--border)] min-h-screen pb-20 lg:pb-0">
+        {/* ── Sticky search bar + pills ── */}
+        <div className="sticky top-0 z-20 bg-[var(--bg-blur)] backdrop-blur-md border-b border-[var(--border)]">
+          <div className="px-4 pt-3 pb-2">
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-[var(--bg2)]">
+              <SearchIcon size={18} className="text-[var(--text2)] shrink-0" />
               <input
                 ref={inputRef}
+                autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search"
-                className="flex-1 bg-transparent text-sm text-[var(--text)] placeholder:text-[var(--text2)] outline-none"
+                className="flex-1 bg-transparent text-[16px] text-[var(--text)] placeholder:text-[var(--text2)] outline-none"
               />
               {query && (
-                <button onClick={() => setQuery("")} className="text-[var(--text2)]">
-                  <CloseIcon size={14} />
+                <button onClick={() => { setQuery(""); inputRef.current?.focus(); }}
+                  className="text-[var(--text2)] hover:text-[var(--text)] transition-colors">
+                  <CloseIcon size={16} />
                 </button>
               )}
             </div>
           </div>
 
-          {/* Type toggle */}
-          {query && (
-            <div className="flex gap-2 mt-2">
-              {(["users", "threads", "tags"] as const).map((t) => (
-                <button key={t} onClick={() => setType(t)}
-                  className={cn(
-                    "px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors",
-                    type === t
-                      ? "bg-[var(--accent)] text-[var(--accent-text)]"
-                      : "bg-[var(--bg2)] text-[var(--text2)] hover:bg-[var(--bg3)]",
-                  )}>
-                  {t}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Filter pills — always visible */}
+          <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-hide">
+            {PILLS.map((p) => (
+              <button
+                key={p}
+                onClick={() => setPill(p)}
+                className={cn(
+                  "whitespace-nowrap rounded-full border px-5 py-1.5 text-[14px] font-medium transition-colors shrink-0",
+                  pill === p
+                    ? "bg-[var(--accent)] border-[var(--accent)] text-[var(--accent-text)]"
+                    : "border-[var(--border)] text-[var(--text)] hover:bg-[var(--bg2)]",
+                )}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Content */}
-        {!query ? (
-          /* Trending page */
-          <div className="p-4">
-            <h2 className="font-semibold text-[var(--text)] mb-4">Trending</h2>
-            <div className="space-y-4">
-              {TRENDING.map((t) => (
-                <button key={t.rank} onClick={() => setQuery(t.topic)}
-                  className="w-full flex items-center justify-between hover:bg-[var(--bg2)] px-2 py-2 rounded-xl transition-colors">
-                  <div className="text-left">
-                    <p className="text-xs text-[var(--text2)]">{t.rank} · Trending</p>
-                    <p className="font-semibold text-[var(--text)]">{t.topic}</p>
-                    <p className="text-xs text-[var(--text2)]">{t.count} threads</p>
+        {/* ── Content ── */}
+        {!query.trim() ? (
+          /* Trending — shown when query is empty */
+          <div className="px-4 py-5">
+            <h2 className="text-[15px] font-semibold text-[var(--text)] mb-5">Trending</h2>
+            <div className="flex flex-col gap-5">
+              {trendingTags.map((t, i) => (
+                <button
+                  key={t.id}
+                  onClick={() => setQuery(`#${t.tag}`)}
+                  className="w-full flex items-start gap-4 text-left group hover:bg-[var(--bg2)] px-2 py-2 rounded-xl transition-colors"
+                >
+                  <span className="text-[15px] text-[var(--text2)] w-5 shrink-0 text-right">{i + 1}</span>
+                  <div className="flex flex-col">
+                    <p className="text-[12px] text-[var(--text2)]">Trending</p>
+                    <p className="text-[16px] font-semibold text-[var(--text)] group-hover:underline">
+                      #{t.tag}
+                    </p>
+                    <p className="text-[12px] text-[var(--text2)]">{fmtN(t.threadCount)} threads</p>
                   </div>
                 </button>
               ))}
@@ -119,31 +177,74 @@ export default function SearchPage() {
           </div>
         ) : loading ? (
           <div className="p-6 text-center text-[var(--text2)] text-sm">Searching…</div>
-        ) : type === "users" && userResults.length === 0 ? (
-          <div className="p-6 text-center text-[var(--text2)] text-sm">No results for "{query}"</div>
-        ) : type === "users" ? (
-          <div>
-            {userResults.map((u) => (
-              <Link key={u.id} href={`/${u.username}`}
-                className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] hover:bg-[var(--bg2)] transition-colors">
-                <Avatar src={u.avatarUrl} alt={u.displayName} size={40} />
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-[var(--text)]">{u.displayName}</p>
-                  <p className="text-xs text-[var(--text2)]">@{u.username}</p>
-                  {u.followerCount !== undefined && (
-                    <p className="text-xs text-[var(--text3)] mt-0.5">{u.followerCount} followers</p>
-                  )}
-                </div>
-              </Link>
-            ))}
+        ) : noResults ? (
+          <div className="p-8 text-center">
+            <p className="text-[var(--text2)] text-[15px]">No results for &quot;{query}&quot;</p>
           </div>
-        ) : threadResults.length === 0 ? (
-          <div className="p-6 text-center text-[var(--text2)] text-sm">No threads found for "{query}"</div>
         ) : (
-          threadResults.map((t) => <PostCard key={t.id} thread={t} />)
+          <>
+            {/* People results */}
+            {(pill === "All" || pill === "People") && userResults.length > 0 && (
+              <div>
+                {pill === "All" && (
+                  <p className="px-4 pt-4 pb-1 text-[13px] font-semibold text-[var(--text2)] uppercase tracking-wider">
+                    People
+                  </p>
+                )}
+                {userResults.map((u) => (
+                  <Link key={u.id} href={`/${u.username}`}
+                    className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] hover:bg-[var(--bg2)] transition-colors">
+                    <div className="flex items-center gap-3">
+                      <Avatar src={u.avatarUrl} alt={u.displayName} size={44} />
+                      <div className="flex flex-col">
+                        <span className="text-[15px] font-semibold text-[var(--text)]">{u.displayName}</span>
+                        <span className="text-[13px] text-[var(--text2)]">@{u.username}</span>
+                        {u.followerCount !== undefined && (
+                          <span className="text-[13px] text-[var(--text)] mt-0.5">
+                            {fmtN(u.followerCount)} followers
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => e.preventDefault()}
+                      className="px-5 py-1.5 rounded-full border border-[var(--border)] text-[14px] font-medium text-[var(--text)] hover:bg-[var(--bg2)] transition-colors"
+                    >
+                      Follow
+                    </button>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {/* Tag results */}
+            {pill === "Tags" && tagResults.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setQuery(`#${t.tag}`)}
+                className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)] hover:bg-[var(--bg2)] transition-colors text-left"
+              >
+                <span className="text-[16px] font-semibold text-[var(--text)]">#{t.tag}</span>
+                <span className="text-[13px] text-[var(--text2)]">{fmtN(t.threadCount)} posts</span>
+              </button>
+            ))}
+
+            {/* Thread / media results */}
+            {(pill === "All" || pill === "Threads" || pill === "Media") && threadResults.length > 0 && (
+              <div>
+                {pill === "All" && userResults.length > 0 && (
+                  <p className="px-4 pt-4 pb-1 text-[13px] font-semibold text-[var(--text2)] uppercase tracking-wider">
+                    Threads
+                  </p>
+                )}
+                {threadResults.map((t) => <PostCard key={t.id} thread={t} />)}
+              </div>
+            )}
+          </>
         )}
       </main>
 
+      <div className="hidden xl:block"><RightPanel /></div>
       <div className="lg:hidden"><MobileNav /></div>
     </div>
   );

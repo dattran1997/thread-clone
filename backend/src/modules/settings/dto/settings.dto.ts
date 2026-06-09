@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsArray,
   MaxLength,
   MinLength,
 } from "class-validator";
@@ -20,6 +21,13 @@ export class UpdateSettingsDto {
   @IsOptional()
   @IsBoolean()
   hideLikeCounts?: boolean;
+}
+
+export class AddHiddenWordDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(50)
+  word: string;
 }
 
 export class ChangePasswordDto {

@@ -47,7 +47,7 @@ export default function HomePage() {
     setThreads([]); setCursor(null); setHasMore(false); setShowPill(false);
     fetchFeed(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
+  }, [tab, isAuthenticated]);
 
   useEffect(() => {
     const startTimer = () => {
@@ -115,7 +115,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {loading && threads.length === 0 ? (
+        {loading && threads.length === 0 && isAuthenticated ? (
           [...Array(5)].map((_, i) => <PostCardSkeleton key={i} />)
         ) : !isAuthenticated ? (
           <div className="flex flex-col items-center justify-center py-24 text-center px-6 gap-4">

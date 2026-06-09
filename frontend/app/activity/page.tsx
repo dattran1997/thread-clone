@@ -8,6 +8,7 @@ import { DesktopSidebar } from "@/components/shell/DesktopSidebar";
 import { MobileNav } from "@/components/shell/MobileNav";
 import { cn, relativeTime } from "@/lib/utils";
 import Link from "next/link";
+import { RightPanel } from "@/components/shell/RightPanel";
 
 type NotifType = "LIKE" | "FOLLOW" | "REPLY" | "REPOST" | "QUOTE" | "MENTION";
 type FilterTab = "all" | "mentions" | "follows";
@@ -81,28 +82,39 @@ export default function ActivityPage() {
 
       <main className="flex-1 max-w-[622px] mx-auto border-r border-[var(--border)] min-h-screen pb-20 lg:pb-0">
         {/* Header */}
-        <div className="sticky top-0 z-20 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-md">
-          <div className="flex items-center justify-between mb-1">
+        <div className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-md">
+          <div className="flex items-center justify-between px-4 pt-4 pb-3">
             <h1 className="text-xl font-bold text-[var(--text)]">
-              Activity {unreadCount > 0 && <span className="text-[var(--text2)] font-normal text-base">({unreadCount} new)</span>}
+              Activity
+              {unreadCount > 0 && (
+                <span className="ml-2 text-sm font-normal text-[var(--text2)]">
+                  {unreadCount} new
+                </span>
+              )}
             </h1>
             {unreadCount > 0 && (
-              <button onClick={markAllRead} className="text-sm text-[var(--accent)] hover:underline">
+              <button
+                onClick={markAllRead}
+                className="text-[13px] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+              >
                 Mark all read
               </button>
             )}
           </div>
 
-          {/* Filter tabs */}
-          <div className="flex gap-2 mt-2">
+          {/* Filter tabs — border-bottom style */}
+          <div className="flex">
             {(["all", "mentions", "follows"] as FilterTab[]).map((f) => (
-              <button key={f} onClick={() => setFilter(f)}
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
                 className={cn(
-                  "px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors",
+                  "flex-1 py-2.5 text-[14px] font-medium capitalize transition-colors border-b-2",
                   filter === f
-                    ? "bg-[var(--accent)] text-[var(--accent-text)]"
-                    : "bg-[var(--bg2)] text-[var(--text2)] hover:bg-[var(--bg3)]",
-                )}>
+                    ? "border-[var(--accent)] text-[var(--text)]"
+                    : "border-transparent text-[var(--text2)] hover:text-[var(--text)]",
+                )}
+              >
                 {f}
               </button>
             ))}
@@ -146,6 +158,7 @@ export default function ActivityPage() {
         )}
       </main>
 
+      <div className="hidden xl:block"><RightPanel /></div>
       <div className="lg:hidden"><MobileNav /></div>
     </div>
   );

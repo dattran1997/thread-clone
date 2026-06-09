@@ -72,6 +72,7 @@ model User {
   notes         String?
   links         String[]
   topics        String[]
+  hiddenWords   String[]  @default([])
   isPrivate     Boolean   @default(false)
   isVerified    Boolean   @default(false)
   isActive      Boolean   @default(true)

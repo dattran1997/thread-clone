@@ -22,6 +22,7 @@ import { MediaModule } from "./modules/media/media.module";
 import { CommunitiesModule } from "./modules/communities/communities.module";
 import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { AdminModule } from "./modules/admin/admin.module";
+import { HashtagsModule } from "./modules/hashtags/hashtags.module";
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { AdminModule } from "./modules/admin/admin.module";
     CommunitiesModule,
     AnalyticsModule,
     AdminModule,
+    HashtagsModule,
   ],
   providers: [
     // Apply JwtAuthGuard globally; use @Public() to opt out

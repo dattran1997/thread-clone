@@ -1,7 +1,6 @@
 import Link from "next/link";
 
-// Server component — fetches trending + suggestions server-side
-export async function RightPanel() {
+export function RightPanel() {
   return (
     <aside className="w-[310px] flex flex-col gap-6 py-6 px-4">
       {/* Search bar */}

@@ -281,6 +281,14 @@ export class ThreadsService {
     };
   }
 
+  // ── Increment view count ───────────────────────────────────────────────────
+  async incrementView(id: string) {
+    await this.prisma.thread.update({
+      where: { id },
+      data: { viewCount: { increment: 1 } },
+    }).catch(() => {}); // silently ignore if thread not found
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────────
   private async fetchFull(id: string, viewerId?: string) {
     const thread = await this.prisma.thread.findUniqueOrThrow({

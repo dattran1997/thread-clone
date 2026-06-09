@@ -13,6 +13,7 @@ import { BackIcon, LinkIcon } from "@/components/ui/Icons";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { RightPanel } from "@/components/shell/RightPanel";
 
 interface Profile {
   id: string; username: string; displayName: string;
@@ -107,7 +108,15 @@ export default function ProfilePage() {
         <div className="px-4 py-5">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-[var(--text)]">{profile.displayName}</h1>
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-2xl font-bold text-[var(--text)]">{profile.displayName}</h1>
+                {profile.isVerified && (
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-label="Verified">
+                    <circle cx="10" cy="10" r="10" fill="#0095F6"/>
+                    <path d="M6 10l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </div>
               <p className="text-[var(--text2)] text-sm">@{profile.username}</p>
             </div>
             <Avatar src={profile.avatarUrl} alt={profile.displayName} size={72} />
@@ -151,7 +160,7 @@ export default function ProfilePage() {
           <div className="flex gap-2">
             {isOwn ? (
               <>
-                <Link href="/settings/profile"
+                <Link href="/settings"
                   className="flex-1 py-2 text-center rounded-xl border border-[var(--border)] text-sm font-medium hover:bg-[var(--bg2)] transition-colors">
                   Edit profile
                 </Link>
@@ -209,6 +218,7 @@ export default function ProfilePage() {
         )}
       </main>
 
+      <div className="hidden xl:block"><RightPanel /></div>
       <div className="lg:hidden"><MobileNav /></div>
     </div>
   );

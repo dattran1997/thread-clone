@@ -82,4 +82,12 @@ export class ThreadsController {
   ) {
     return this.threadsService.votePoll(id, user.id, optionId);
   }
+
+  @Post(":id/view")
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: "Record a thread view (idempotent per session)" })
+  recordView(@Param("id") id: string) {
+    return this.threadsService.incrementView(id);
+  }
 }

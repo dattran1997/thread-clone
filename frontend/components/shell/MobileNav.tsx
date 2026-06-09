@@ -4,37 +4,61 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useNotificationStore } from "@/stores/notifications";
+import { useComposeStore } from "@/stores/compose";
 import {
   HomeIcon, SearchIcon, ComposeIcon, BellIcon, MessageIcon,
 } from "@/components/ui/Icons";
 import { Avatar } from "@/components/ui/Avatar";
-
-interface NavItem {
-  href: string;
-  label: string;
-  icon: React.ReactNode;
-  badge?: number;
-}
 
 export function MobileNav() {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const unreadNotifications = useNotificationStore((s) => s.unreadCount);
   const unreadMessages = useNotificationStore((s) => s.unreadMessages);
+  const openCompose = useComposeStore((s) => s.open);
 
-  const items: NavItem[] = [
+  const linkItems = [
     { href: "/", label: "Home", icon: <HomeIcon size={24} /> },
     { href: "/search", label: "Search", icon: <SearchIcon size={24} /> },
-    { href: "/compose", label: "Compose", icon: <ComposeIcon size={24} /> },
     { href: "/activity", label: "Activity", icon: <BellIcon size={24} />, badge: unreadNotifications },
     { href: "/messages", label: "Messages", icon: <MessageIcon size={24} />, badge: unreadMessages },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-2 pb-safe bg-[var(--bg-blur)] backdrop-blur-md border-t border-[var(--border)]"
-      style={{ height: 60 }}>
-      {items.map((item) => {
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-2 pb-safe bg-[var(--bg-blur)] backdrop-blur-md border-t border-[var(--border)]"
+      style={{ height: 60 }}
+    >
+      {/* Home */}
+      {linkItems.slice(0, 2).map((item) => {
         const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            aria-label={item.label}
+            className={cn(
+              "relative flex items-center justify-center w-12 h-12 rounded-xl transition-colors",
+              active ? "text-[var(--text)]" : "text-[var(--text2)]",
+            )}
+          >
+            {item.icon}
+          </Link>
+        );
+      })}
+
+      {/* Compose button (middle) */}
+      <button
+        onClick={() => openCompose()}
+        aria-label="New thread"
+        className="relative flex items-center justify-center w-12 h-12 rounded-xl text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+      >
+        <ComposeIcon size={26} />
+      </button>
+
+      {/* Activity + Messages */}
+      {linkItems.slice(2).map((item) => {
+        const active = pathname === item.href || pathname.startsWith(item.href);
         return (
           <Link
             key={item.href}
@@ -54,6 +78,7 @@ export function MobileNav() {
           </Link>
         );
       })}
+
       {/* Profile avatar */}
       <Link href={user ? `/${user.username}` : "/login"} aria-label="Profile">
         <Avatar src={user?.avatarUrl} alt={user?.displayName ?? "Profile"} size={28} />

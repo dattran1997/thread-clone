@@ -1,17 +1,18 @@
 "use client";
 import { useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  Heart, MessageCircle, Repeat2, Send, BarChart2, Bookmark,
+  MoreHorizontal, Link2, EyeOff, Flag, Trash2, PenLine,
+} from "lucide-react";
 import { cn, fmtN, relativeTime } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { toast } from "@/components/ui/Toast";
 import { Avatar } from "@/components/ui/Avatar";
-import {
-  HeartIcon, ChatIcon, RepeatIcon, ShareIcon, BookmarkIcon,
-  MoreIcon, EditIcon, TrashIcon, GhostIcon, PollIcon,
-} from "@/components/ui/Icons";
 import { useAuthStore } from "@/stores/auth";
 
-// ─── Types (mirrors shared Thread shape) ──────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface Author {
   id: string; username: string; displayName: string;
   avatarUrl: string | null; isVerified: boolean;
@@ -30,22 +31,13 @@ interface Media {
 }
 
 export interface Thread {
-  id: string;
-  author: Author;
-  text: string;
-  parentId: string | null;
-  isGhost: boolean;
-  isEdited: boolean;
+  id: string; author: Author; text: string;
+  parentId: string | null; isGhost: boolean; isEdited: boolean;
   editableUntil: string | null;
-  likeCount: number; replyCount: number; repostCount: number; quoteCount: number;
-  media: Media[];
-  poll: Poll | null;
-  hashtags: string[];
-  topics: string[];
-  isLiked: boolean;
-  isReposted: boolean;
-  isSaved: boolean;
-  createdAt: string;
+  likeCount: number; replyCount: number; repostCount: number;
+  quoteCount: number; viewCount: number;
+  media: Media[]; poll: Poll | null; hashtags: string[]; topics: string[];
+  isLiked: boolean; isReposted: boolean; isSaved: boolean; createdAt: string;
 }
 
 interface PostCardProps {
@@ -54,7 +46,7 @@ interface PostCardProps {
   showReplyLine?: boolean;
 }
 
-// ─── Poll component ────────────────────────────────────────────────────────────
+// ─── Poll block ───────────────────────────────────────────────────────────────
 function PollBlock({ poll, threadId, onVoted }: { poll: Poll; threadId: string; onVoted: () => void }) {
   const user = useAuthStore((s) => s.user);
   const hasVoted = !!poll.userVoteOptionId;
@@ -73,30 +65,18 @@ function PollBlock({ poll, threadId, onVoted }: { poll: Poll; threadId: string; 
       {poll.options.map((opt) => {
         const pct = poll.totalVotes > 0 ? Math.round((opt.voteCount / poll.totalVotes) * 100) : 0;
         return (
-          <button
-            key={opt.id}
-            onClick={() => vote(opt.id)}
+          <button key={opt.id} onClick={() => vote(opt.id)}
             disabled={hasVoted || expired || !user}
             className={cn(
-              "relative w-full rounded-xl border border-[var(--border)] overflow-hidden text-left",
-              "transition-all hover:border-[var(--text2)] disabled:cursor-default",
+              "relative w-full rounded-xl border border-[var(--border)] overflow-hidden text-left transition-all hover:border-[var(--text2)] disabled:cursor-default",
               opt.id === poll.userVoteOptionId && "border-[var(--accent)]",
-            )}
-          >
-            {/* Progress bar */}
+            )}>
             {(hasVoted || expired) && (
-              <div
-                className="absolute inset-y-0 left-0 bg-[var(--bg2)] transition-all"
-                style={{ width: `${pct}%` }}
-              />
+              <div className="absolute inset-y-0 left-0 bg-[var(--bg2)] transition-all" style={{ width: `${pct}%` }} />
             )}
             <div className="relative flex justify-between px-3 py-2.5 text-sm">
-              <span className={cn("font-medium", opt.id === poll.userVoteOptionId && "text-[var(--accent)]")}>
-                {opt.text}
-              </span>
-              {(hasVoted || expired) && (
-                <span className="text-[var(--text2)]">{pct}%</span>
-              )}
+              <span className={cn("font-medium", opt.id === poll.userVoteOptionId && "text-[var(--accent)]")}>{opt.text}</span>
+              {(hasVoted || expired) && <span className="text-[var(--text2)]">{pct}%</span>}
             </div>
           </button>
         );
@@ -108,34 +88,119 @@ function PollBlock({ poll, threadId, onVoted }: { poll: Poll; threadId: string; 
   );
 }
 
-// ─── Main PostCard ─────────────────────────────────────────────────────────────
+// ─── Quote dialog ─────────────────────────────────────────────────────────────
+function QuoteDialog({ thread, onClose }: { thread: Thread; onClose: () => void }) {
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const MAX = 500;
+
+  async function submit() {
+    if (!text.trim() || loading) return;
+    setLoading(true);
+    try {
+      await api.post(`/threads/${thread.id}/quote`, { quoteText: text.trim() });
+      toast("Quote posted");
+      onClose();
+    } catch { toast("Failed to quote", "error"); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}>
+      <div className="w-full max-w-[560px] rounded-2xl bg-[var(--bg2)] border border-[var(--border)] shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+          <button onClick={onClose} className="text-[var(--text2)] text-sm hover:text-[var(--text)]">Cancel</button>
+          <span className="text-sm font-semibold text-[var(--text)]">Quote thread</span>
+          <button onClick={submit} disabled={!text.trim() || loading}
+            className="px-4 py-1.5 rounded-full bg-[var(--accent)] text-[var(--accent-text)] text-sm font-semibold disabled:opacity-40 transition-opacity">
+            {loading ? "Posting…" : "Post"}
+          </button>
+        </div>
+        {/* Original thread preview */}
+        <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg3)] rounded-none">
+          <div className="flex items-center gap-2 mb-1">
+            <Avatar src={thread.author.avatarUrl} alt={thread.author.displayName} size={20} />
+            <span className="text-xs font-semibold text-[var(--text)]">{thread.author.displayName}</span>
+            <span className="text-xs text-[var(--text2)]">@{thread.author.username}</span>
+          </div>
+          <p className="text-sm text-[var(--text2)] line-clamp-3">{thread.text}</p>
+        </div>
+        {/* Quote compose */}
+        <div className="px-4 py-3">
+          <textarea value={text} onChange={(e) => setText(e.target.value)} autoFocus rows={3}
+            placeholder="Add your thoughts…"
+            className="w-full bg-transparent text-sm text-[var(--text)] placeholder:text-[var(--text3)] resize-none outline-none leading-relaxed" />
+          <div className="flex justify-end">
+            <span className={cn("text-xs", text.length > MAX ? "text-red-500" : "text-[var(--text3)]")}>{MAX - text.length}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Repost dropdown ──────────────────────────────────────────────────────────
+function RepostMenu({ thread, reposted, onRepost, onQuote, onClose }:
+  { thread: Thread; reposted: boolean; onRepost: () => void; onQuote: () => void; onClose: () => void }) {
+  return (
+    <div className="absolute bottom-full left-0 mb-1 z-30 bg-[var(--bg2)] border border-[var(--border)] rounded-xl shadow-xl overflow-hidden min-w-[160px]"
+      onClick={(e) => e.stopPropagation()}>
+      <button onClick={() => { onRepost(); onClose(); }}
+        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-[var(--bg3)] text-[var(--text)] transition-colors">
+        <Repeat2 size={16} className={reposted ? "text-green-500" : ""} />
+        {reposted ? "Remove repost" : "Repost"}
+      </button>
+      <button onClick={() => { onQuote(); onClose(); }}
+        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-[var(--bg3)] text-[var(--text)] transition-colors">
+        <MessageCircle size={16} />
+        Quote
+      </button>
+    </div>
+  );
+}
+
+// ─── PostCard ─────────────────────────────────────────────────────────────────
 export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardProps) {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
+
   const [liked, setLiked] = useState(thread.isLiked);
   const [likeCount, setLikeCount] = useState(thread.likeCount);
   const [reposted, setReposted] = useState(thread.isReposted);
   const [repostCount, setRepostCount] = useState(thread.repostCount);
   const [saved, setSaved] = useState(thread.isSaved);
-  const [showMenu, setShowMenu] = useState(false);
   const [poll, setPoll] = useState(thread.poll);
   const [heartBurst, setHeartBurst] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showRepostMenu, setShowRepostMenu] = useState(false);
+  const [showQuoteDialog, setShowQuoteDialog] = useState(false);
 
   const isOwn = user?.id === thread.author.id;
+  const canEdit = !!thread.editableUntil && new Date() < new Date(thread.editableUntil);
+
+  // Record view on mount (fire-and-forget)
+  const [viewed] = useState(() => {
+    if (typeof window !== "undefined") {
+      api.post(`/threads/${thread.id}/view`, {}).catch(() => {});
+    }
+    return true;
+  });
+  void viewed;
 
   // ── Like ──────────────────────────────────────────────────────────────────
-  async function toggleLike() {
+  const toggleLike = useCallback(async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!user) return;
     const newLiked = !liked;
-    setLiked(newLiked);
-    setLikeCount((c) => c + (newLiked ? 1 : -1));
+    setLiked(newLiked); setLikeCount((c) => c + (newLiked ? 1 : -1));
     try {
       if (newLiked) await api.post(`/threads/${thread.id}/like`, {});
       else await api.delete(`/threads/${thread.id}/like`);
-    } catch {
-      setLiked(!newLiked);
-      setLikeCount((c) => c + (newLiked ? -1 : 1));
-    }
-  }
+    } catch { setLiked(!newLiked); setLikeCount((c) => c + (newLiked ? -1 : 1)); }
+  }, [liked, user, thread.id]);
 
   // ── Double-tap like ────────────────────────────────────────────────────────
   function handleDoubleTap() {
@@ -149,24 +214,16 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
   async function toggleRepost() {
     if (!user) return;
     const newReposted = !reposted;
-    setReposted(newReposted);
-    setRepostCount((c) => c + (newReposted ? 1 : -1));
+    setReposted(newReposted); setRepostCount((c) => c + (newReposted ? 1 : -1));
     try {
-      if (newReposted) {
-        await api.post(`/threads/${thread.id}/repost`, {});
-        toast("Reposted");
-      } else {
-        await api.delete(`/threads/${thread.id}/repost`);
-        toast("Removed repost");
-      }
-    } catch {
-      setReposted(!newReposted);
-      setRepostCount((c) => c + (newReposted ? -1 : 1));
-    }
+      if (newReposted) { await api.post(`/threads/${thread.id}/repost`, {}); toast("Reposted"); }
+      else { await api.delete(`/threads/${thread.id}/repost`); toast("Removed repost"); }
+    } catch { setReposted(!newReposted); setRepostCount((c) => c + (newReposted ? -1 : 1)); }
   }
 
   // ── Save ───────────────────────────────────────────────────────────────────
-  async function toggleSave() {
+  async function toggleSave(e: React.MouseEvent) {
+    e.stopPropagation();
     if (!user) return;
     const newSaved = !saved;
     setSaved(newSaved);
@@ -177,13 +234,14 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
   }
 
   // ── Share ──────────────────────────────────────────────────────────────────
-  function share() {
-    const url = `${window.location.origin}/threads/${thread.id}`;
-    navigator.clipboard.writeText(url).then(() => toast("Link copied"));
+  function share(e: React.MouseEvent) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(`${window.location.origin}/threads/${thread.id}`).then(() => toast("Link copied"));
   }
 
   // ── Delete ─────────────────────────────────────────────────────────────────
-  async function handleDelete() {
+  async function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation();
     setShowMenu(false);
     if (!confirm("Delete this thread?")) return;
     try {
@@ -194,190 +252,189 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
   }
 
   return (
-    <article
-      onDoubleClick={handleDoubleTap}
-      className="relative flex gap-3 px-4 py-4 border-b border-[var(--border)] hover:bg-[var(--bg2)]/30 transition-colors cursor-default"
-    >
-      {/* Double-tap heart burst */}
-      {heartBurst && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-          <HeartIcon size={80} className="text-red-500 animate-[heartPop_0.6s_ease_forwards]" />
-        </div>
-      )}
-
-      {/* Avatar column */}
-      <div className="flex flex-col items-center gap-1">
-        <Link href={`/${thread.author.username}`}>
-          <Avatar src={thread.author.avatarUrl} alt={thread.author.displayName} size={36} />
-        </Link>
-        {showReplyLine && <div className="flex-1 w-px bg-[var(--border)] mt-1" />}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Link href={`/${thread.author.username}`} className="font-semibold text-[var(--text)] text-sm hover:underline truncate">
-              {thread.author.displayName}
-            </Link>
-            {thread.author.isVerified && (
-              <svg width={14} height={14} viewBox="0 0 16 16" fill="#60a5fa"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zm3.78 5.22a.75.75 0 0 0-1.06 0L7 8.94 5.28 7.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.06 0l4.25-4.25a.75.75 0 0 0 0-1.06z" /></svg>
-            )}
-            {thread.isGhost && <GhostIcon size={14} className="text-[var(--text2)]" />}
+    <>
+      <article
+        onDoubleClick={handleDoubleTap}
+        className="relative flex gap-3 px-4 py-4 border-b border-[var(--border)] cursor-pointer hover:bg-white/[0.02] transition-colors group"
+        onClick={() => router.push(`/threads/${thread.id}`)}
+      >
+        {/* Heart burst */}
+        {heartBurst && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+            <Heart size={72} className="text-red-500 animate-[heartPop_0.6s_ease_forwards]" fill="currentColor" />
           </div>
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <span className="text-xs text-[var(--text2)]">{relativeTime(thread.createdAt)}</span>
-            {thread.isEdited && <span className="text-xs text-[var(--text2)]">· edited</span>}
-            {/* Menu */}
-            <div className="relative">
-              <button
-                onClick={() => setShowMenu(!showMenu)}
-                className="p-1 text-[var(--text2)] hover:text-[var(--text)] rounded-full"
-              >
-                <MoreIcon size={18} />
+        )}
+
+        {/* Avatar column */}
+        <div className="flex flex-col items-center flex-shrink-0">
+          <Link href={`/${thread.author.username}`} onClick={(e) => e.stopPropagation()}>
+            <Avatar src={thread.author.avatarUrl} alt={thread.author.displayName} size={40} />
+          </Link>
+          {showReplyLine && <div className="flex-1 w-0.5 bg-[var(--border)] mt-2 rounded-full min-h-[20px]" />}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          {/* Header row */}
+          <div className="flex items-start justify-between gap-2 mb-0.5">
+            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+              <Link href={`/${thread.author.username}`}
+                onClick={(e) => e.stopPropagation()}
+                className="font-semibold text-[15px] text-[var(--text)] hover:underline truncate">
+                {thread.author.displayName}
+              </Link>
+              {thread.author.isVerified && (
+                <svg width={14} height={14} viewBox="0 0 16 16" fill="#60a5fa" className="flex-shrink-0">
+                  <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zm3.78 5.22a.75.75 0 0 0-1.06 0L7 8.94 5.28 7.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.06 0l4.25-4.25a.75.75 0 0 0 0-1.06z" />
+                </svg>
+              )}
+              <span className="text-[13px] text-[var(--text2)] truncate">@{thread.author.username}</span>
+              <span className="text-[13px] text-[var(--text2)] flex-shrink-0">· {relativeTime(thread.createdAt)}</span>
+              {thread.isEdited && <span className="text-[12px] text-[var(--text3)]">· edited</span>}
+            </div>
+
+            {/* Bookmark + More */}
+            <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+              <button onClick={toggleSave}
+                className={cn("p-1.5 rounded-full transition-colors hover:bg-[var(--bg3)]",
+                  saved ? "text-[var(--accent)]" : "text-[var(--text2)] hover:text-[var(--text)]")}>
+                <Bookmark size={17} fill={saved ? "currentColor" : "none"} />
               </button>
-              {showMenu && (
-                <div className="absolute right-0 top-7 z-20 bg-[var(--bg2)] border border-[var(--border)] rounded-xl shadow-lg overflow-hidden min-w-[140px]">
-                  {isOwn && thread.editableUntil && new Date() < new Date(thread.editableUntil) && (
-                    <Link
-                      href={`/threads/${thread.id}/edit`}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-[var(--bg3)] text-[var(--text)]"
-                    >
-                      <EditIcon size={15} /> Edit
-                    </Link>
-                  )}
-                  {isOwn && (
-                    <button
-                      onClick={handleDelete}
-                      className="flex items-center gap-2 w-full px-4 py-2.5 text-sm hover:bg-[var(--bg3)] text-red-500"
-                    >
-                      <TrashIcon size={15} /> Delete
+              <div className="relative">
+                <button onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+                  className="p-1.5 rounded-full text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg3)] transition-colors">
+                  <MoreHorizontal size={17} />
+                </button>
+                {showMenu && (
+                  <div className="absolute right-0 top-8 z-30 bg-[var(--bg2)] border border-[var(--border)] rounded-xl shadow-xl overflow-hidden min-w-[160px]">
+                    <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${location.origin}/threads/${thread.id}`); toast("Link copied"); setShowMenu(false); }}
+                      className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-[var(--bg3)] text-[var(--text)] transition-colors">
+                      <Link2 size={15} /> Copy link
                     </button>
+                    {!isOwn && (
+                      <button onClick={(e) => { e.stopPropagation(); toast("Muted @" + thread.author.username); setShowMenu(false); }}
+                        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-[var(--bg3)] text-[var(--text)] transition-colors">
+                        <EyeOff size={15} /> Mute
+                      </button>
+                    )}
+                    {!isOwn && (
+                      <button onClick={(e) => { e.stopPropagation(); toast("Report submitted"); setShowMenu(false); }}
+                        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-[var(--bg3)] text-red-400 transition-colors">
+                        <Flag size={15} /> Report
+                      </button>
+                    )}
+                    {isOwn && canEdit && (
+                      <Link href={`/threads/${thread.id}/edit`} onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-[var(--bg3)] text-[var(--text)] transition-colors">
+                        <PenLine size={15} /> Edit
+                      </Link>
+                    )}
+                    {isOwn && (
+                      <button onClick={handleDelete}
+                        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-[var(--bg3)] text-red-500 transition-colors">
+                        <Trash2 size={15} /> Delete
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Thread text */}
+          <p className="text-[15px] text-[var(--text)] leading-relaxed whitespace-pre-wrap break-words mt-0.5">
+            {thread.text}
+          </p>
+
+          {/* Media grid */}
+          {thread.media.length > 0 && (
+            <div className={cn("mt-2 gap-1.5 rounded-xl overflow-hidden",
+              thread.media.length === 1 ? "flex" : "grid grid-cols-2")}>
+              {thread.media.slice(0, 4).map((m) => (
+                <div key={m.id} className="relative aspect-[4/3] bg-[var(--bg3)] rounded-xl overflow-hidden">
+                  {m.type === "IMAGE" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={m.url} alt={m.altText ?? ""} className="w-full h-full object-cover" />
+                  ) : (
+                    <video src={m.url} className="w-full h-full object-cover" controls />
                   )}
-                  <button
-                    onClick={() => { share(); setShowMenu(false); }}
-                    className="flex items-center gap-2 w-full px-4 py-2.5 text-sm hover:bg-[var(--bg3)] text-[var(--text)]"
-                  >
-                    <ShareIcon size={15} /> Share
-                  </button>
+                </div>
+              ))}
+              {thread.media.length > 4 && (
+                <div className="aspect-[4/3] bg-[var(--bg3)] rounded-xl flex items-center justify-center text-sm text-[var(--text2)]">
+                  +{thread.media.length - 4}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Poll */}
+          {poll && (
+            <PollBlock poll={poll} threadId={thread.id}
+              onVoted={async () => {
+                const updated = await api.get<Thread>(`/threads/${thread.id}`);
+                setPoll(updated.poll);
+              }} />
+          )}
+
+          {/* Action row */}
+          <div className="flex items-center mt-3 -ml-1" onClick={(e) => e.stopPropagation()}>
+            {/* Like */}
+            <button onClick={(e) => toggleLike(e)}
+              className={cn("flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-colors text-[13px]",
+                liked ? "text-red-500" : "text-[var(--text2)] hover:text-red-400 hover:bg-red-500/10")}>
+              <Heart size={20} fill={liked ? "currentColor" : "none"}
+                className={liked ? "animate-[heartPop_0.3s_ease]" : ""} />
+              <span>{fmtN(likeCount)}</span>
+            </button>
+
+            {/* Reply */}
+            <Link href={`/threads/${thread.id}`}
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-full text-[13px] text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg3)] transition-colors">
+              <MessageCircle size={20} />
+              <span>{fmtN(thread.replyCount)}</span>
+            </Link>
+
+            {/* Repost */}
+            <div className="relative">
+              <button onClick={() => setShowRepostMenu(!showRepostMenu)}
+                className={cn("flex items-center gap-1.5 px-2 py-1.5 rounded-full text-[13px] transition-colors",
+                  reposted ? "text-green-500" : "text-[var(--text2)] hover:text-green-400 hover:bg-green-500/10")}>
+                <Repeat2 size={20} />
+                <span>{fmtN(repostCount)}</span>
+              </button>
+              {showRepostMenu && (
+                <RepostMenu thread={thread} reposted={reposted}
+                  onRepost={toggleRepost}
+                  onQuote={() => setShowQuoteDialog(true)}
+                  onClose={() => setShowRepostMenu(false)} />
+              )}
+            </div>
+
+            {/* Share */}
+            <button onClick={share}
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-full text-[13px] text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg3)] transition-colors">
+              <Send size={20} />
+            </button>
+
+            {/* Views — pushed right */}
+            <div className="flex items-center gap-1 ml-auto text-[12px] text-[var(--text3)]">
+              <BarChart2 size={15} />
+              <span>{fmtN(thread.viewCount)}</span>
             </div>
           </div>
         </div>
 
-        {/* Username */}
-        <Link href={`/${thread.author.username}`} className="text-xs text-[var(--text2)] hover:underline">
-          @{thread.author.username}
-        </Link>
-
-        {/* Text */}
-        <Link href={`/threads/${thread.id}`} className="block mt-1.5">
-          <p className="text-sm text-[var(--text)] leading-relaxed whitespace-pre-wrap break-words">
-            {thread.text}
-          </p>
-        </Link>
-
-        {/* Media */}
-        {thread.media.length > 0 && (
-          <div className={cn("mt-2 gap-1", thread.media.length > 1 ? "grid grid-cols-2" : "flex")}>
-            {thread.media.slice(0, 4).map((m) => (
-              <div key={m.id} className="rounded-xl overflow-hidden aspect-square bg-[var(--bg3)]">
-                {m.type === "IMAGE" ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={m.url} alt={m.altText ?? ""} className="w-full h-full object-cover" />
-                ) : (
-                  <video src={m.url} className="w-full h-full object-cover" controls />
-                )}
-              </div>
-            ))}
-            {thread.media.length > 4 && (
-              <div className="rounded-xl bg-[var(--bg3)] flex items-center justify-center text-sm text-[var(--text2)]">
-                +{thread.media.length - 4}
-              </div>
-            )}
-          </div>
+        {/* Close menus when clicking elsewhere */}
+        {(showMenu || showRepostMenu) && (
+          <div className="fixed inset-0 z-20" onClick={(e) => { e.stopPropagation(); setShowMenu(false); setShowRepostMenu(false); }} />
         )}
+      </article>
 
-        {/* Poll */}
-        {poll && (
-          <PollBlock
-            poll={poll}
-            threadId={thread.id}
-            onVoted={async () => {
-              const updated = await api.get<Thread>(`/threads/${thread.id}`);
-              setPoll(updated.poll);
-            }}
-          />
-        )}
-
-        {/* Hashtags */}
-        {thread.hashtags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {thread.hashtags.map((tag) => (
-              <Link key={tag} href={`/search?q=%23${tag}`} className="text-xs text-blue-400 hover:underline">
-                #{tag}
-              </Link>
-            ))}
-          </div>
-        )}
-
-        {/* Action row */}
-        <div className="flex items-center gap-4 mt-3">
-          <button
-            onClick={toggleLike}
-            className={cn(
-              "flex items-center gap-1.5 text-xs transition-all",
-              liked ? "text-red-500" : "text-[var(--text2)] hover:text-red-500",
-            )}
-            aria-label={liked ? "Unlike" : "Like"}
-          >
-            <HeartIcon
-              size={18}
-              fill={liked ? "currentColor" : "none"}
-              className={liked ? "animate-[heartPop_0.3s_ease]" : ""}
-            />
-            <span>{fmtN(likeCount)}</span>
-          </button>
-
-          <Link
-            href={`/threads/${thread.id}`}
-            className="flex items-center gap-1.5 text-xs text-[var(--text2)] hover:text-[var(--text)] transition-colors"
-          >
-            <ChatIcon size={18} />
-            <span>{fmtN(thread.replyCount)}</span>
-          </Link>
-
-          <button
-            onClick={toggleRepost}
-            className={cn(
-              "flex items-center gap-1.5 text-xs transition-colors",
-              reposted ? "text-green-500" : "text-[var(--text2)] hover:text-green-500",
-            )}
-          >
-            <RepeatIcon size={18} />
-            <span>{fmtN(repostCount)}</span>
-          </button>
-
-          <button
-            onClick={toggleSave}
-            className={cn(
-              "flex items-center gap-1.5 text-xs transition-colors",
-              saved ? "text-[var(--accent)]" : "text-[var(--text2)] hover:text-[var(--text)]",
-            )}
-          >
-            <BookmarkIcon size={18} fill={saved ? "currentColor" : "none"} />
-          </button>
-
-          <button
-            onClick={share}
-            className="flex items-center gap-1.5 text-xs text-[var(--text2)] hover:text-[var(--text)] transition-colors ml-auto"
-          >
-            <ShareIcon size={18} />
-          </button>
-        </div>
-      </div>
-    </article>
+      {/* Quote dialog */}
+      {showQuoteDialog && (
+        <QuoteDialog thread={thread} onClose={() => setShowQuoteDialog(false)} />
+      )}
+    </>
   );
 }

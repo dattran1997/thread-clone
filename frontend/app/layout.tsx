@@ -3,6 +3,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/shell/ThemeProvider";
 import { WsProvider } from "@/components/shell/WsProvider";
 import { ToastHost } from "@/components/ui/Toast";
+import { ComposeSheet } from "@/components/thread/ComposeSheet";
 
 export const metadata: Metadata = {
   title: { default: "Threads", template: "%s · Threads" },
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <WsProvider />
           {children}
           <ToastHost />
+          <ComposeSheet />
         </ThemeProvider>
       </body>
     </html>

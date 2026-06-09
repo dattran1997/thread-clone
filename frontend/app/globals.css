@@ -14,7 +14,9 @@
   --text:        #f0f0f0;
   --text2:       #888;
   --text3:       #555;
-  --border:      #2e2e2e;
+  --border:      #3a3a3a;
+  --input-bg:    #1e1e1e;
+  --input-border: rgba(255,255,255,0.12);
   --accent:      #f0f0f0;
   --accent-text: #101010;
   --link:        #888;

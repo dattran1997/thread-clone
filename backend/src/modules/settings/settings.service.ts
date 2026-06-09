@@ -61,6 +61,38 @@ export class SettingsService {
     return { success: true };
   }
 
+  async getHiddenWords(userId: string): Promise<{ words: string[] }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { hiddenWords: true },
+    });
+    return { words: user?.hiddenWords ?? [] };
+  }
+
+  async addHiddenWord(userId: string, word: string): Promise<{ words: string[] }> {
+    const w = word.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { hiddenWords: true } });
+    const current = user?.hiddenWords ?? [];
+    if (current.includes(w)) return { words: current };
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { hiddenWords: { push: w } },
+      select: { hiddenWords: true },
+    });
+    return { words: updated.hiddenWords };
+  }
+
+  async removeHiddenWord(userId: string, word: string): Promise<{ words: string[] }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { hiddenWords: true } });
+    const filtered = (user?.hiddenWords ?? []).filter((w) => w !== word);
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { hiddenWords: filtered },
+      select: { hiddenWords: true },
+    });
+    return { words: updated.hiddenWords };
+  }
+
   async changeEmail(userId: string, dto: ChangeEmailDto) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },

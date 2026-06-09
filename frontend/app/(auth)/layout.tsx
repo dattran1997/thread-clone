@@ -1,7 +1,7 @@
-// Auth layout — no nav, centered content
+// Auth layout — no nav, full-screen centered
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-[var(--bg)]">
+    <div className="min-h-screen flex items-center justify-center bg-[#101010] px-4 py-12">
       {children}
     </div>
   );
