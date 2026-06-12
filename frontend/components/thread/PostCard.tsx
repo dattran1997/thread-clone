@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { connectSocket } from "@/lib/ws";
@@ -44,46 +44,161 @@ export interface Thread {
 interface PostCardProps {
   thread: Thread;
   onDelete?: (id: string) => void;
+  onUnsave?: (id: string) => void;
   showReplyLine?: boolean;
 }
 
 // ─── Poll block ───────────────────────────────────────────────────────────────
-function PollBlock({ poll, threadId, onVoted }: { poll: Poll; threadId: string; onVoted: () => void }) {
+function PollBlock({ poll: initialPoll, threadId, onVoted }: {
+  poll: Poll; threadId: string; onVoted: (updated: Poll) => void;
+}) {
   const user = useAuthStore((s) => s.user);
+  const [poll, setPoll] = useState(initialPoll);
+  const votingRef = useRef(false);
+  // Tracks whether the user voted in THIS session — prevents the sync-effect from
+  // overwriting local state with stale feed data after an optimistic update.
+  const hasVotedRef = useRef(!!initialPoll.userVoteOptionId);
+
   const hasVoted = !!poll.userVoteOptionId;
-  const expired = new Date() > new Date(poll.expiresAt);
+  const expired  = new Date() > new Date(poll.expiresAt);
+
+  // Results are shown only when the viewer has actually voted or the poll closed.
+  // Owners are treated the same as any other user: they vote first, then see results.
+  const showResults = hasVoted || expired;
+
+  // Always derive totalVotes from the live options array so it is guaranteed
+  // to be consistent with individual voteCount values — prevents > 100 % display.
+  const totalVotes = poll.options.reduce((sum, o) => sum + (o.voteCount ?? 0), 0);
+  const maxVotes   = poll.options.reduce((max, o) => Math.max(max, o.voteCount ?? 0), 0);
+
+  // Sync incoming prop changes only while the user has NOT voted locally.
+  // Once they vote (hasVotedRef = true) we own the local state.
+  useEffect(() => {
+    if (!hasVotedRef.current) setPoll(initialPoll);
+  }, [initialPoll]);
 
   async function vote(optionId: string) {
-    if (!user || hasVoted || expired) return;
+    if (!user)                                    { toast("Log in to vote", "error"); return; }
+    if (hasVoted || expired || votingRef.current) return;
+
+    votingRef.current   = true;
+    hasVotedRef.current = true; // lock before setState so the sync-effect never overwrites
+
+    // Optimistic update — feels instant even before the network round-trip
+    const optimistic: Poll = {
+      ...poll,
+      userVoteOptionId: optionId,
+      totalVotes: totalVotes + 1,
+      options: poll.options.map((o) =>
+        o.id === optionId ? { ...o, voteCount: (o.voteCount ?? 0) + 1 } : o,
+      ),
+    };
+    setPoll(optimistic);
+
     try {
-      await api.post(`/threads/${threadId}/poll/vote`, { optionId });
-      onVoted();
-    } catch { toast("Failed to vote", "error"); }
+      // Backend returns the full updated thread; pull the authoritative poll from it.
+      const updatedThread = await api.post<any>(`/threads/${threadId}/poll/vote`, { optionId });
+      const serverPoll: Poll = updatedThread?.poll ?? optimistic;
+      // Settle on the server's numbers (voteCount, totalVotes, userVoteOptionId all correct)
+      setPoll(serverPoll);
+      onVoted(serverPoll);
+    } catch (err: any) {
+      const alreadyVoted = (err?.message ?? "").toLowerCase().includes("already");
+      if (alreadyVoted) {
+        // Server says "already voted" — keep optimistic state, treat as success
+        onVoted(optimistic);
+      } else {
+        // Real error: roll back and let the user try again
+        hasVotedRef.current = false;
+        setPoll(initialPoll);
+        toast(err?.message ?? "Failed to vote", "error");
+      }
+    } finally {
+      votingRef.current = false;
+    }
   }
 
   return (
-    <div className="mt-3 space-y-2">
+    <div className="mt-3 space-y-1.5" onClick={(e) => e.stopPropagation()}>
       {poll.options.map((opt) => {
-        const pct = poll.totalVotes > 0 ? Math.round((opt.voteCount / poll.totalVotes) * 100) : 0;
-        return (
-          <button key={opt.id} onClick={() => vote(opt.id)}
-            disabled={hasVoted || expired || !user}
-            className={cn(
-              "relative w-full rounded-xl border border-border overflow-hidden text-left transition-all hover:border-muted-foreground disabled:cursor-default",
-              opt.id === poll.userVoteOptionId && "border-primary",
-            )}>
-            {(hasVoted || expired) && (
-              <div className="absolute inset-y-0 left-0 bg-secondary transition-all" style={{ width: `${pct}%` }} />
-            )}
-            <div className="relative flex justify-between px-3 py-2.5 text-sm">
-              <span className={cn("font-medium text-foreground", opt.id === poll.userVoteOptionId && "text-primary")}>{opt.text}</span>
-              {(hasVoted || expired) && <span className="text-muted-foreground">{pct}%</span>}
+        const voteCount = opt.voteCount ?? 0;
+        const pct       = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+        const isChosen  = opt.id === poll.userVoteOptionId;
+        const isLeading = maxVotes > 0 && voteCount === maxVotes;
+
+        /* ── Results view (voted / owner / expired) ── */
+        if (showResults) {
+          return (
+            <div key={opt.id} className="flex items-center gap-2.5">
+              {/* Bar + label */}
+              <div className="relative flex-1 h-10 rounded-xl overflow-hidden bg-foreground/[0.06]">
+                {/* Animated fill */}
+                <div
+                  className={cn(
+                    "absolute inset-y-0 left-0 rounded-xl transition-[width] duration-700 ease-out",
+                    isChosen ? "bg-primary/25" : "bg-foreground/[0.10]",
+                  )}
+                  style={{ width: `${pct}%` }}
+                />
+                {/* Text + checkmark */}
+                <div className="relative flex items-center h-full px-3 gap-1.5 min-w-0">
+                  {isChosen && (
+                    <svg
+                      width="13" height="13" viewBox="0 0 12 12"
+                      fill="none" stroke="currentColor"
+                      strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+                      className="flex-shrink-0 text-primary"
+                    >
+                      <path d="M1.5 6 4.5 9 10.5 3" />
+                    </svg>
+                  )}
+                  <span className={cn(
+                    "text-[14px] truncate",
+                    isChosen  ? "font-bold text-primary"
+                    : isLeading ? "font-semibold text-foreground"
+                    :             "font-medium text-foreground/75",
+                  )}>
+                    {opt.text}
+                  </span>
+                </div>
+              </div>
+              {/* Percentage — outside the bar so it's always readable */}
+              <span className={cn(
+                "text-[13px] tabular-nums w-9 text-right flex-shrink-0",
+                isChosen   ? "font-bold text-primary"
+                : isLeading ? "font-semibold text-foreground"
+                :             "text-muted-foreground",
+              )}>
+                {pct}%
+              </span>
             </div>
+          );
+        }
+
+        /* ── Pre-vote button ── */
+        return (
+          <button
+            key={opt.id}
+            onClick={() => vote(opt.id)}
+            className={cn(
+              "w-full text-left px-4 py-2.5 rounded-xl border text-[14px] font-medium",
+              "border-border/60 text-foreground transition-all",
+              "hover:border-foreground/35 hover:bg-foreground/[0.04] active:scale-[0.99]",
+            )}
+          >
+            {opt.text}
           </button>
         );
       })}
-      <p className="text-xs text-muted-foreground">
-        {poll.totalVotes} votes · {expired ? "Closed" : `Closes ${relativeTime(poll.expiresAt)}`}
+
+      {/* Footer — vote count + status */}
+      <p className="text-[12px] text-muted-foreground pt-0.5">
+        {totalVotes.toLocaleString()} {totalVotes === 1 ? "vote" : "votes"}
+        {" · "}
+        {expired
+          ? "Final results"
+          : `Closes ${relativeTime(poll.expiresAt)}`
+        }
       </p>
     </div>
   );
@@ -289,7 +404,7 @@ function ReportDialog({ thread, onClose }: { thread: Thread; onClose: () => void
 }
 
 // ─── PostCard ─────────────────────────────────────────────────────────────────
-export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardProps) {
+export function PostCard({ thread, onDelete, onUnsave, showReplyLine = false }: PostCardProps) {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
 
@@ -298,12 +413,13 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
   const [reposted, setReposted] = useState(thread.isReposted);
   const [repostCount, setRepostCount] = useState(thread.repostCount);
   const [replyCount, setReplyCount] = useState(thread.replyCount);
+
+  // Sync replyCount when the prop changes (e.g. handleReply updates data.thread)
+  useEffect(() => { setReplyCount(thread.replyCount); }, [thread.replyCount]);
   const [saved, setSaved] = useState(thread.isSaved);
   const [poll, setPoll] = useState(thread.poll);
   const [heartBurst, setHeartBurst] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [showRepostMenu, setShowRepostMenu] = useState(false);
-  const [showQuoteDialog, setShowQuoteDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const isOwn = user?.id === thread.author.id;
@@ -334,15 +450,6 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread.id]);
-
-  // Record view on mount (fire-and-forget)
-  const [viewed] = useState(() => {
-    if (typeof window !== "undefined") {
-      api.post(`/threads/${thread.id}/view`, {}).catch(() => {});
-    }
-    return true;
-  });
-  void viewed;
 
   // ── Like ──────────────────────────────────────────────────────────────────
   const toggleLike = useCallback(async (e?: React.MouseEvent) => {
@@ -383,7 +490,7 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
     setSaved(newSaved);
     try {
       if (newSaved) { await api.post(`/threads/${thread.id}/save`, {}); toast("Saved"); }
-      else { await api.delete(`/threads/${thread.id}/save`); toast("Removed from saved"); }
+      else { await api.delete(`/threads/${thread.id}/save`); toast("Removed from saved"); onUnsave?.(thread.id); }
     } catch { setSaved(!newSaved); }
   }
 
@@ -450,6 +557,11 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
                 <span className="text-[13px] text-muted-foreground truncate">@{thread.author.username}</span>
                 <span className="text-[13px] text-muted-foreground flex-shrink-0">· {relativeTime(thread.createdAt)}</span>
                 {thread.isEdited && <span className="text-[12px] text-muted-foreground">· edited</span>}
+                {thread.isGhost && (
+                  <span className="flex items-center gap-0.5 text-[11px] text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded-full px-1.5 py-0.5 flex-shrink-0" title="Ghost post — disappears in 24h">
+                    👻 ghost
+                  </span>
+                )}
               </div>
 
               {/* Bookmark + More */}
@@ -502,39 +614,52 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
             ))}
 
             {/* Image/Video grid */}
-            {thread.media.filter((m) => m.type !== "AUDIO").length > 0 && (
-              <div className={cn("mt-2 gap-2",
-                thread.media.filter((m) => m.type !== "AUDIO").length === 1 ? "flex" : "grid grid-cols-2")}>
-                {thread.media.filter((m) => m.type !== "AUDIO").slice(0, 4).map((m) => (
-                  <div key={m.id} className="relative aspect-[4/3] bg-muted rounded-xl overflow-hidden border border-border">
-                    {m.type === "IMAGE" ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={m.url}
-                        alt={m.altText ?? ""}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                      />
-                    ) : (
-                      <video src={m.url} className="absolute inset-0 w-full h-full object-cover" controls />
-                    )}
-                  </div>
-                ))}
-                {thread.media.filter((m) => m.type !== "AUDIO").length > 4 && (
-                  <div className="aspect-[4/3] bg-muted rounded-xl flex items-center justify-center text-sm text-muted-foreground">
-                    +{thread.media.filter((m) => m.type !== "AUDIO").length - 4}
-                  </div>
-                )}
-              </div>
-            )}
+            {(() => {
+              const visuals = thread.media.filter((m) => m.type !== "AUDIO");
+              if (!visuals.length) return null;
+              const display = visuals.slice(0, 4);
+              return (
+                <div className={cn("mt-2 gap-2",
+                  display.length === 1 ? "block" : "grid grid-cols-2")}>
+                  {display.map((m) => (
+                    <div key={m.id} className="relative w-full aspect-[4/3] bg-muted rounded-xl overflow-hidden border border-border">
+                      {m.type === "IMAGE" ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={m.url}
+                          alt={m.altText ?? ""}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          onError={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            img.style.display = "none";
+                            // Show placeholder text in parent
+                            const parent = img.parentElement;
+                            if (parent && !parent.querySelector(".img-error")) {
+                              const msg = document.createElement("div");
+                              msg.className = "img-error absolute inset-0 flex items-center justify-center text-xs text-muted-foreground";
+                              msg.textContent = "Image unavailable";
+                              parent.appendChild(msg);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <video src={m.url} className="absolute inset-0 w-full h-full object-cover" controls />
+                      )}
+                    </div>
+                  ))}
+                  {visuals.length > 4 && (
+                    <div className="aspect-[4/3] bg-muted rounded-xl flex items-center justify-center text-sm text-muted-foreground">
+                      +{visuals.length - 4}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Poll */}
             {poll && (
               <PollBlock poll={poll} threadId={thread.id}
-                onVoted={async () => {
-                  const updated = await api.get<Thread>(`/threads/${thread.id}`);
-                  setPoll(updated.poll);
-                }} />
+                onVoted={(updatedPoll) => setPoll(updatedPoll)} />
             )}
 
             {/* Action row */}
@@ -556,22 +681,6 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
                   <span className="text-[13px]">{fmtN(replyCount)}</span>
                 </Link>
 
-                {/* Repost */}
-                <div className="relative">
-                  <button onClick={() => setShowRepostMenu(!showRepostMenu)}
-                    className={cn("flex items-center gap-1.5 transition-colors hover:text-foreground",
-                      reposted && "text-green-500")}>
-                    <Repeat2 size={20} />
-                    <span className="text-[13px]">{fmtN(repostCount)}</span>
-                  </button>
-                  {showRepostMenu && (
-                    <RepostMenu thread={thread} reposted={reposted}
-                      onRepost={toggleRepost}
-                      onQuote={() => setShowQuoteDialog(true)}
-                      onClose={() => setShowRepostMenu(false)} />
-                  )}
-                </div>
-
                 {/* Share */}
                 <button onClick={share}
                   className="flex items-center gap-1.5 transition-colors hover:text-foreground">
@@ -592,14 +701,10 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
         <div className="h-[1px] w-full bg-border" />
 
         {/* Close menus when clicking elsewhere */}
-        {(showMenu || showRepostMenu) && (
-          <div className="fixed inset-0 z-20" onClick={(e) => { e.stopPropagation(); setShowMenu(false); setShowRepostMenu(false); }} />
+        {showMenu && (
+          <div className="fixed inset-0 z-20" onClick={(e) => { e.stopPropagation(); setShowMenu(false); }} />
         )}
       </div>
-
-      {showQuoteDialog && (
-        <QuoteDialog thread={thread} onClose={() => setShowQuoteDialog(false)} />
-      )}
 
       {showDeleteConfirm && (
         <DeleteConfirmModal onConfirm={confirmDelete} onCancel={() => setShowDeleteConfirm(false)} />

@@ -22,6 +22,7 @@ export class NotificationsService {
         type: data.type as any,
         entityId: data.entityId,
         entityType: data.entityType,
+        ...(data.preview && { preview: data.preview }),
       },
       include: {
         actor: {

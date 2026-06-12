@@ -5,13 +5,14 @@ import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useNotificationStore } from "@/stores/notifications";
 import { useComposeStore } from "@/stores/compose";
-import { Home, Search, PlusCircle, Bell, User } from "lucide-react";
+import { Home, Search, PlusCircle, Bell, Mail, User } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 
 export function MobileNav() {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const unreadNotifications = useNotificationStore((s) => s.unreadCount);
+  const unreadMessages = useNotificationStore((s) => s.unreadMessages);
   const openCompose = useComposeStore((s) => s.open);
 
   const isActive = (href: string) =>
@@ -49,6 +50,18 @@ export function MobileNav() {
         <Bell size={26} />
         {unreadNotifications > 0 && (
           <span className="absolute top-2.5 right-2 h-2 w-2 rounded-full bg-[#ff3040] border-2 border-background" />
+        )}
+      </Link>
+
+      {/* Messages — blue dot when unread DMs */}
+      <Link href="/messages" aria-label="Messages"
+        className={cn("relative flex items-center justify-center w-12 h-12 transition-colors",
+          isActive("/messages") ? "text-foreground" : "text-muted-foreground")}>
+        <Mail size={26} />
+        {unreadMessages > 0 && (
+          <span className="absolute top-2.5 right-2 min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-[#0095f6] rounded-full flex items-center justify-center border-2 border-background">
+            {unreadMessages > 99 ? "99+" : unreadMessages}
+          </span>
         )}
       </Link>
 

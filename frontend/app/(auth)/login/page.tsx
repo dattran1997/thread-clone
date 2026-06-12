@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { toast } from "@/components/ui/Toast";
@@ -17,7 +17,17 @@ function handleGoogleLogin() {
 }
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="w-full max-w-[400px]" />}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const justVerified = searchParams.get("verified") === "1";
   const setAuth = useAuthStore((s) => s.setAuth);
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
@@ -54,7 +64,7 @@ export default function LoginPage() {
     setResending(true);
     try {
       await api.post("/auth/resend-verification", { email: unverifiedEmail });
-      toast("Verification link sent — check your email (or console in dev)");
+      toast("Verification link sent — check your inbox");
     } catch {
       toast("Failed to resend — try again", "error");
     } finally {
@@ -73,6 +83,18 @@ export default function LoginPage() {
         <h1 className="text-[26px] text-foreground text-center">Log in to Threads</h1>
       </div>
 
+      {/* Email just verified — green banner */}
+      {justVerified && (
+        <div className="rounded-xl bg-green-500/10 border border-green-500/30 px-4 py-3">
+          <p className="text-[14px] text-green-600 dark:text-green-400 font-medium">
+            ✓ Email verified!
+          </p>
+          <p className="text-[13px] text-muted-foreground mt-0.5">
+            Your account is active. Log in to get started.
+          </p>
+        </div>
+      )}
+
       {/* Email not verified notice */}
       {unverifiedEmail && (
         <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-3 space-y-2">
@@ -81,7 +103,7 @@ export default function LoginPage() {
           </p>
           <p className="text-[13px] text-muted-foreground">
             We sent a verification link to <strong>{unverifiedEmail}</strong>.
-            Check your inbox (or console if running in dev mode).
+            Check your inbox and click the link to activate your account.
           </p>
           <button
             onClick={resendVerification}
@@ -114,10 +136,15 @@ export default function LoginPage() {
           onChange={(e) => setForm({ ...form, password: e.target.value })}
           className={inputClass}
         />
+        <div className="flex justify-end">
+          <Link href="/forgot-password" className="text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+            Forgot password?
+          </Link>
+        </div>
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-4 mt-2 rounded-xl bg-primary text-primary-foreground font-bold text-[15px] hover:opacity-90 active:opacity-80 transition-opacity disabled:opacity-40"
+          className="w-full py-4 mt-1 rounded-xl bg-primary text-primary-foreground font-bold text-[15px] hover:opacity-90 active:opacity-80 transition-opacity disabled:opacity-40"
         >
           {loading ? "Logging in…" : "Log in"}
         </button>

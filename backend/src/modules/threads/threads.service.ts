@@ -3,6 +3,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { NotificationsGateway } from "../notifications/notifications.gateway";
+import { NotificationsService } from "../notifications/notifications.service";
 import { CreateThreadDto } from "./dto/create-thread.dto";
 import { UpdateThreadDto } from "./dto/update-thread.dto";
 
@@ -81,6 +82,7 @@ export class ThreadsService {
   constructor(
     private prisma: PrismaService,
     private gateway: NotificationsGateway,
+    private notificationsService: NotificationsService,
   ) {}
 
   // ── Create ─────────────────────────────────────────────────────────────────
@@ -149,17 +151,40 @@ export class ThreadsService {
       }
     }
 
-    // Increment parent reply count and broadcast to live viewers
+    // Increment parent reply count, broadcast to live viewers, notify parent author
     if (dto.parentId) {
-      const updated = await this.prisma.thread.update({
+      const parentThread = await this.prisma.thread.update({
         where: { id: dto.parentId },
         data: { replyCount: { increment: 1 } },
-        select: { likeCount: true, repostCount: true, replyCount: true },
+        select: { authorId: true, likeCount: true, repostCount: true, replyCount: true },
       });
-      this.gateway.emitThreadUpdate(dto.parentId, updated);
+      this.gateway.emitThreadUpdate(dto.parentId, {
+        likeCount: parentThread.likeCount,
+        repostCount: parentThread.repostCount,
+        replyCount: parentThread.replyCount,
+      });
+
+      // Notify parent author (not self-replies)
+      if (parentThread.authorId !== userId) {
+        this.notificationsService.create({
+          recipientId: parentThread.authorId,
+          actorId: userId,
+          type: "REPLY",
+          entityId: thread.id,
+          entityType: "thread",
+          preview: dto.text?.slice(0, 100),
+        }).then((n) => this.gateway.emitToUser(parentThread.authorId, "notification", n)).catch(() => {});
+      }
     }
 
-    return this.fetchFull(thread.id, userId);
+    const fullThread = await this.fetchFull(thread.id, userId);
+
+    // Broadcast the full reply to anyone currently viewing the parent thread
+    if (dto.parentId) {
+      this.gateway.emitNewReply(dto.parentId, fullThread);
+    }
+
+    return fullThread;
   }
 
   // ── Get single thread ──────────────────────────────────────────────────────
@@ -169,11 +194,6 @@ export class ThreadsService {
       select: makeSelect(viewerId),
     });
     if (!thread || thread.status === "DELETED") throw new NotFoundException("Thread not found");
-
-    this.prisma.thread
-      .update({ where: { id }, data: { viewCount: { increment: 1 } } })
-      .catch(() => {});
-
     return this.withViewerState(thread, viewerId);
   }
 
@@ -218,6 +238,22 @@ export class ThreadsService {
       },
     });
 
+    // Replace media: detach all existing, then attach the new set
+    if (dto.mediaIds !== undefined) {
+      // Detach all current media from this thread
+      await this.prisma.threadMedia.updateMany({
+        where: { threadId: id },
+        data: { threadId: null },
+      });
+      // Attach the new set (newly uploaded + kept existing)
+      if (dto.mediaIds.length) {
+        await this.prisma.threadMedia.updateMany({
+          where: { id: { in: dto.mediaIds } },
+          data: { threadId: id },
+        });
+      }
+    }
+
     return this.fetchFull(id, userId);
   }
 
@@ -229,6 +265,27 @@ export class ThreadsService {
     });
     if (!thread || thread.status === "DELETED") throw new NotFoundException("Thread not found");
     if (thread.authorId !== userId) throw new ForbiddenException();
+
+    // Clean up hashtag counts and join records before soft-deleting
+    const threadHashtags = await this.prisma.threadHashtag.findMany({
+      where: { threadId: id },
+      select: { hashtagId: true },
+    });
+
+    if (threadHashtags.length > 0) {
+      const hashtagIds = threadHashtags.map((th) => th.hashtagId);
+      await this.prisma.$transaction([
+        // Remove join records first
+        this.prisma.threadHashtag.deleteMany({ where: { threadId: id } }),
+        // Decrement threadCount on each affected hashtag (floor at 0)
+        ...hashtagIds.map((hashtagId) =>
+          this.prisma.hashtag.updateMany({
+            where: { id: hashtagId, threadCount: { gt: 0 } },
+            data: { threadCount: { decrement: 1 } },
+          }),
+        ),
+      ]);
+    }
 
     await this.prisma.thread.update({
       where: { id },

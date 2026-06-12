@@ -180,13 +180,17 @@ export class AuthService {
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const nodemailer = require("nodemailer");
+      const smtpPort = Number(this.config.get<string>("SMTP_PORT") ?? "587");
+      const smtpPass = (this.config.get<string>("SMTP_PASS") ?? "").replace(/\s/g, "");
       const transporter = nodemailer.createTransport({
-        host: this.config.get<string>("SMTP_HOST"),
-        port: Number(this.config.get<string>("SMTP_PORT") ?? "587"),
-        auth: { user: smtpUser, pass: this.config.get<string>("SMTP_PASS") },
+        host: this.config.get<string>("SMTP_HOST") ?? "smtp.gmail.com",
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+        tls: { rejectUnauthorized: false },
       });
       await transporter.sendMail({
-        from: this.config.get<string>("EMAIL_FROM") ?? "noreply@threads-clone.local",
+        from: `"Threads" <${smtpUser}>`,
         to: email,
         subject: "Reset your password — Threads",
         html: `
@@ -318,17 +322,18 @@ export class AuthService {
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const nodemailer = require("nodemailer");
+      const smtpPort = Number(this.config.get<string>("SMTP_PORT") ?? "587");
+      const smtpPass = (this.config.get<string>("SMTP_PASS") ?? "").replace(/\s/g, "");
       const transporter = nodemailer.createTransport({
-        host: this.config.get<string>("SMTP_HOST"),
-        port: Number(this.config.get<string>("SMTP_PORT") ?? "587"),
-        auth: {
-          user: smtpUser,
-          pass: this.config.get<string>("SMTP_PASS"),
-        },
+        host: this.config.get<string>("SMTP_HOST") ?? "smtp.gmail.com",
+        port: smtpPort,
+        secure: smtpPort === 465,   // true only for port 465, STARTTLS for 587
+        auth: { user: smtpUser, pass: smtpPass },
+        tls: { rejectUnauthorized: false },
       });
 
       await transporter.sendMail({
-        from: this.config.get<string>("EMAIL_FROM") ?? "noreply@threads-clone.local",
+        from: `"Threads" <${smtpUser}>`,
         to: email,
         subject: "Verify your email — Threads",
         html: `
@@ -354,30 +359,45 @@ export class AuthService {
     return crypto.createHash("sha256").update(token).digest("hex");
   }
 
+  /** Issues tokens and saves the session in one step, returning the session ID too */
   private async issueTokens(
     sub: string,
     email: string,
     username: string,
     role: string,
   ) {
-    const payload = { sub, email, username, role };
+    // 1. Generate session record first to get its ID
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30d
+    const session = await this.prisma.session.create({
+      data: { userId: sub, refreshTokenHash: "pending", expiresAt },
+    });
+
+    // 2. Sign tokens with sid (session ID) in the access token payload
+    const payload = { sub, email, username, role, sid: session.id };
     const [accessToken, refreshToken] = await Promise.all([
       this.jwt.signAsync(payload, {
         secret: this.config.get<string>("jwt.accessSecret"),
         expiresIn: (this.config.get<string>("jwt.accessExpiresIn") ?? "15m") as any,
       }),
-      this.jwt.signAsync({ sub }, {
+      this.jwt.signAsync({ sub, sid: session.id }, {
         secret: this.config.get<string>("jwt.refreshSecret"),
         expiresIn: (this.config.get<string>("jwt.refreshExpiresIn") ?? "30d") as any,
       }),
     ]);
-    return { accessToken, refreshToken };
+
+    // 3. Update the session with the actual refresh token hash
+    const tokenHash = this.hashToken(refreshToken);
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: { refreshTokenHash: tokenHash },
+    });
+
+    return { accessToken, refreshToken, sessionId: session.id };
   }
 
   private async saveRefreshToken(userId: string, token: string) {
-    const tokenHash = this.hashToken(token);
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30d
-    await this.prisma.session.create({ data: { userId, refreshTokenHash: tokenHash, expiresAt } });
+    // No-op — session creation is now handled inside issueTokens
+    // Kept for compatibility; callers can safely remove their saveRefreshToken calls
   }
 
   private publicUser(user: {

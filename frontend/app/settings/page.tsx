@@ -155,7 +155,7 @@ export default function SettingsPage() {
   const [forgotSent, setForgotSent] = useState(false);
 
   // Sessions (login activity)
-  interface SessionInfo { id: string; createdAt: string; expiresAt: string; }
+  interface SessionInfo { id: string; createdAt: string; expiresAt: string; isCurrent: boolean; }
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [activeSessionMenu, setActiveSessionMenu] = useState<string | null>(null);
@@ -294,9 +294,15 @@ export default function SettingsPage() {
   }
 
   async function revokeSession(sessionId: string) {
+    const isCurrentSession = sessions.find((s) => s.id === sessionId)?.isCurrent ?? false;
     try {
       await api.delete(`/settings/sessions/${sessionId}`);
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      if (isCurrentSession) {
+        clearAuth();
+        router.replace("/login");
+        return;
+      }
       toast("Session signed out");
     } catch { toast("Failed to sign out session", "error"); }
     setActiveSessionMenu(null);
@@ -314,10 +320,14 @@ export default function SettingsPage() {
 
   async function saveProfile() {
     if (profileSaving) return;
+    if (!profileForm.displayName.trim()) {
+      toast("Name cannot be empty", "error");
+      return;
+    }
     setProfileSaving(true);
     try {
       const body: Record<string, unknown> = {};
-      if (profileForm.displayName.trim()) body.displayName = profileForm.displayName.trim();
+      body.displayName = profileForm.displayName.trim();
       if (profileForm.bio !== undefined) body.bio = profileForm.bio;
       if (profileForm.notes !== undefined) body.notes = profileForm.notes;
       // Wrap single link into array, validated as URL on backend
@@ -330,7 +340,6 @@ export default function SettingsPage() {
       // Reflect displayName change in nav/header immediately
       if (body.displayName) updateUser({ displayName: body.displayName as string });
       toast("Profile saved");
-      setView("main");
     } catch (err: unknown) {
       toast(err instanceof Error ? err.message : "Failed to save", "error");
     } finally {
@@ -377,7 +386,7 @@ export default function SettingsPage() {
         action={
           <button
             onClick={saveProfile}
-            disabled={profileSaving}
+            disabled={profileSaving || !profileForm.displayName.trim()}
             className="text-[15px] font-medium text-primary hover:opacity-80 disabled:opacity-40"
           >
             {profileSaving ? "Saving…" : "Save"}
@@ -424,8 +433,11 @@ export default function SettingsPage() {
               onChange={(e) => setProfileForm((f) => ({ ...f, displayName: e.target.value }))}
               maxLength={50}
               placeholder="Your name"
-              className={inputCls}
+              className={cn(inputCls, !profileForm.displayName.trim() && "border-destructive focus:border-destructive")}
             />
+            {!profileForm.displayName.trim() && (
+              <p className="text-[12px] text-destructive ml-1 mt-1">Name is required</p>
+            )}
           </Field>
 
           <Field label="Username">
@@ -580,9 +592,6 @@ export default function SettingsPage() {
             <p className="text-[14px] text-muted-foreground">
               If an account with <strong>{forgotEmail}</strong> exists, we sent a reset link.
               It expires in 1 hour.
-            </p>
-            <p className="text-[13px] text-muted-foreground">
-              (In dev mode, check the backend console for the reset URL.)
             </p>
             <button
               onClick={() => { setForgotSent(false); setView("security"); }}

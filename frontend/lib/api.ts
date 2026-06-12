@@ -146,4 +146,19 @@ export const api = {
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  /** Multipart file upload — do NOT set Content-Type (browser sets it with boundary) */
+  upload: <T>(path: string, form: FormData) => {
+    const { accessToken } = getStoredAuth();
+    return fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      body: form,
+    }).then(async (res) => {
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(body.message ?? "Upload failed");
+      }
+      return res.json() as Promise<T>;
+    });
+  },
 };

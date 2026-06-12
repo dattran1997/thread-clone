@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { useNotificationStore } from "@/stores/notifications";
@@ -7,7 +8,6 @@ import { Avatar } from "@/components/ui/Avatar";
 import { DesktopSidebar } from "@/components/shell/DesktopSidebar";
 import { MobileNav } from "@/components/shell/MobileNav";
 import { cn, relativeTime } from "@/lib/utils";
-import Link from "next/link";
 import { RightPanel } from "@/components/shell/RightPanel";
 import { Heart, UserPlus, MessageCircle, Repeat2, AtSign } from "lucide-react";
 
@@ -44,13 +44,15 @@ const TYPE_BADGE: Record<NotifType, string> = {
 };
 
 export default function ActivityPage() {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const hasHydrated = useAuthStore((s) => s._hasHydrated);
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
   const setUnreadCount = useNotificationStore((s) => s.setUnreadCount);
+  const decrementUnread = useNotificationStore((s) => s.decrementUnread);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<FilterTab>("all");
   const [loading, setLoading] = useState(true);
-  const [unreadCount, setLocalUnread] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -60,14 +62,31 @@ export default function ActivityPage() {
       api.get<{ count: number }>("/notifications/unread-count"),
     ]).then(([notifs, count]) => {
       setNotifications(notifs.data);
-      setLocalUnread(count.count);
+      setUnreadCount(count.count);
     }).finally(() => setLoading(false));
-  }, [user]);
+  }, [user, setUnreadCount]);
+
+  // Called when user clicks a notification — marks it read immediately (visual),
+  // then navigates. Using router.push instead of <Link> so the state re-renders
+  // (dot disappears) before navigation happens.
+  function handleNotifClick(n: Notification) {
+    const href = n.entityType === "thread" ? `/threads/${n.entityId}` : `/${n.actor.username}`;
+
+    if (!n.isRead) {
+      api.patch(`/notifications/${n.id}/read`, {}).catch(() => {});
+      setNotifications((prev) =>
+        prev.map((notif) => notif.id === n.id ? { ...notif, isRead: true } : notif),
+      );
+      decrementUnread();
+    }
+
+    // Navigate after state update so user briefly sees the dot disappear
+    router.push(href);
+  }
 
   async function markAllRead() {
     await api.patch("/notifications/read-all", {});
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    setLocalUnread(0);
     setUnreadCount(0);
   }
 
@@ -102,16 +121,11 @@ export default function ActivityPage() {
             <h1 className="text-xl font-bold text-foreground">
               Activity
               {unreadCount > 0 && (
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  {unreadCount} new
-                </span>
+                <span className="ml-2 text-sm font-normal text-muted-foreground">{unreadCount} new</span>
               )}
             </h1>
             {unreadCount > 0 && (
-              <button
-                onClick={markAllRead}
-                className="text-[13px] text-muted-foreground hover:text-foreground transition-colors"
-              >
+              <button onClick={markAllRead} className="text-[13px] text-muted-foreground hover:text-foreground transition-colors">
                 Mark all read
               </button>
             )}
@@ -146,13 +160,18 @@ export default function ActivityPage() {
             {filtered.map((n) => {
               const cfg = TYPE_CONFIG[n.type];
               const badgeClass = TYPE_BADGE[n.type];
-              const href = n.entityType === "thread" ? `/threads/${n.entityId}` : `/${n.actor.username}`;
               return (
-                <Link key={n.id} href={href}
+                <div
+                  key={n.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleNotifClick(n)}
+                  onKeyDown={(e) => e.key === "Enter" && handleNotifClick(n)}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-4 border-b border-border transition-colors hover:bg-foreground/5",
+                    "flex items-center gap-3 px-4 py-4 border-b border-border transition-colors hover:bg-foreground/5 cursor-pointer",
                     !n.isRead && "bg-foreground/5 border-l-2 border-l-primary",
-                  )}>
+                  )}
+                >
                   {/* Avatar + icon badge */}
                   <div className="relative flex-shrink-0">
                     <Avatar src={n.actor.avatarUrl} alt={n.actor.displayName} size={36} />
@@ -173,8 +192,9 @@ export default function ActivityPage() {
                     <p className="text-xs text-muted-foreground mt-0.5">{relativeTime(n.createdAt)}</p>
                   </div>
 
+                  {/* Unread dot — disappears instantly on click because state updates before navigation */}
                   {!n.isRead && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />}
-                </Link>
+                </div>
               );
             })}
           </div>

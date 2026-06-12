@@ -71,8 +71,8 @@ export class SettingsController {
 
   @Get("sessions")
   @ApiOperation({ summary: "List active sessions" })
-  getSessions(@CurrentUser() user: { id: string }) {
-    return this.settingsService.getSessions(user.id);
+  getSessions(@CurrentUser() user: { id: string; sid?: string }) {
+    return this.settingsService.getSessions(user.id, user.sid);
   }
 
   @Delete("sessions/:sessionId")
@@ -88,7 +88,7 @@ export class SettingsController {
   @Delete("sessions")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Sign out all other sessions" })
-  revokeAllOtherSessions(@CurrentUser() user: { id: string }) {
-    return this.settingsService.revokeAllOtherSessions(user.id);
+  revokeAllOtherSessions(@CurrentUser() user: { id: string; sid?: string }) {
+    return this.settingsService.revokeAllOtherSessions(user.id, user.sid);
   }
 }

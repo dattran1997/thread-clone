@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { NotificationsGateway } from "../notifications/notifications.gateway";
+import { NotificationsService } from "../notifications/notifications.service";
 
 @Injectable()
 export class ReactionsService {
   constructor(
     private prisma: PrismaService,
     private gateway: NotificationsGateway,
+    private notificationsService: NotificationsService,
   ) {}
 
   private async ensureThread(id: string) {
@@ -32,11 +34,23 @@ export class ReactionsService {
     });
     if (existing) return { liked: true };
 
-    await this.prisma.$transaction([
+    const [, thread] = await this.prisma.$transaction([
       this.prisma.threadLike.create({ data: { userId, threadId } }),
       this.prisma.thread.update({ where: { id: threadId }, data: { likeCount: { increment: 1 } } }),
     ]);
     this.broadcastThreadCounts(threadId).catch(() => {});
+
+    // Notify thread author (not self-likes)
+    if (thread.authorId !== userId) {
+      this.notificationsService.create({
+        recipientId: thread.authorId,
+        actorId: userId,
+        type: "LIKE",
+        entityId: threadId,
+        entityType: "thread",
+      }).then((n) => this.gateway.emitToUser(thread.authorId, "notification", n)).catch(() => {});
+    }
+
     return { liked: true };
   }
 
@@ -63,11 +77,23 @@ export class ReactionsService {
     });
     if (existing) return { reposted: true };
 
-    await this.prisma.$transaction([
+    const [, thread] = await this.prisma.$transaction([
       this.prisma.threadRepost.create({ data: { userId, threadId } }),
       this.prisma.thread.update({ where: { id: threadId }, data: { repostCount: { increment: 1 } } }),
     ]);
     this.broadcastThreadCounts(threadId).catch(() => {});
+
+    // Notify thread author (not self-reposts)
+    if (thread.authorId !== userId) {
+      this.notificationsService.create({
+        recipientId: thread.authorId,
+        actorId: userId,
+        type: "REPOST",
+        entityId: threadId,
+        entityType: "thread",
+      }).then((n) => this.gateway.emitToUser(thread.authorId, "notification", n)).catch(() => {});
+    }
+
     return { reposted: true };
   }
 

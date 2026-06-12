@@ -3,7 +3,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { useAuthStore } from "@/stores/auth";
 import { toast } from "@/components/ui/Toast";
 import { Logo } from "@/components/shell/Logo";
 import { Check, X } from "lucide-react";
@@ -63,7 +62,6 @@ function validatePassword(v: string) {
 
 export default function RegisterPage() {
   const router = useRouter();
-  const setAuth = useAuthStore((s) => s.setAuth);
 
   const [form, setForm] = useState({ username: "", displayName: "", email: "", password: "" });
   const [errors, setErrors] = useState({ username: "", displayName: "", email: "", password: "" });
@@ -110,12 +108,8 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      const res = await api.post<{ user: any; accessToken: string; refreshToken: string }>(
-        "/auth/register", form,
-      );
-      setAuth(res.user, res.accessToken, res.refreshToken);
-      toast("Welcome to Threads! 🎉");
-      router.replace("/");
+      await api.post("/auth/register", form);
+      router.replace(`/verify-email?email=${encodeURIComponent(form.email)}`);
     } catch (err: any) {
       toast(err?.message ?? "Registration failed", "error");
     } finally {

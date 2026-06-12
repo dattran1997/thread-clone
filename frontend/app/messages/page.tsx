@@ -3,12 +3,15 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
+import { useNotificationStore } from "@/stores/notifications";
 import { Avatar } from "@/components/ui/Avatar";
 import { DesktopSidebar } from "@/components/shell/DesktopSidebar";
 import { MobileNav } from "@/components/shell/MobileNav";
 import { cn, relativeTime } from "@/lib/utils";
-import { ChevronLeft, Send } from "lucide-react";
+import { ChevronLeft, Send, MoreHorizontal, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { connectMessagesSocket, disconnectMessagesSocket } from "@/lib/ws";
+import { toast } from "@/components/ui/Toast";
 
 // Matches the shape returned by GET /messages (getConversations)
 interface Conversation {
@@ -41,11 +44,19 @@ export default function MessagesPage() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const hasHydrated = useAuthStore((s) => s._hasHydrated);
   const searchParams = useSearchParams();
+
+  const decrementMessages = useNotificationStore((s) => s.decrementMessages);
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConv, setActiveConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
+  // Which conversation's "…" menu is open (null = none)
+  const [convMenu, setConvMenu] = useState<string | null>(null);
+  // Which message is being hovered (for delete button)
+  const [hoveredMsg, setHoveredMsg] = useState<string | null>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   // Ref so the socket handler always sees the current conversation without stale closure
   const activeConvRef = useRef<Conversation | null>(null);
@@ -55,6 +66,14 @@ export default function MessagesPage() {
     activeConvRef.current = activeConv;
   }, [activeConv]);
 
+  // Close the conv menu when clicking anywhere outside
+  useEffect(() => {
+    if (!convMenu) return;
+    const close = () => setConvMenu(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [convMenu]);
+
   // Load conversation list, then handle ?user= deep-link
   useEffect(() => {
     if (!user) return;
@@ -62,7 +81,14 @@ export default function MessagesPage() {
 
     api.get<{ data: Conversation[] }>("/messages")
       .then(async (r) => {
-        setConversations(r.data);
+        // Deduplicate by conversationId — in case the DB somehow has duplicates
+        const seen = new Set<string>();
+        const deduped = r.data.filter((c) => {
+          if (seen.has(c.conversationId)) return false;
+          seen.add(c.conversationId);
+          return true;
+        });
+        setConversations(deduped);
 
         if (recipientId) {
           // ?user=<userId> — start or open a conversation with that user
@@ -76,11 +102,10 @@ export default function MessagesPage() {
               unreadCount: 0,
               updatedAt: res.updatedAt,
             };
-            // Add to list if it isn't already there
+            // Add to list only if not already there
             setConversations((prev) =>
               prev.some((c) => c.conversationId === res.id) ? prev : [conv, ...prev],
             );
-            // Open the chat immediately
             openConversation(conv);
           } catch {}
         }
@@ -89,7 +114,7 @@ export default function MessagesPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Connect to /messages namespace and listen for real-time messages
+  // Connect to /messages namespace and listen for real-time events
   useEffect(() => {
     if (!accessToken) return;
 
@@ -99,27 +124,38 @@ export default function MessagesPage() {
       // Append to chat view if this conversation is open
       if (activeConvRef.current?.conversationId === msg.conversationId) {
         setMessages((prev) => {
-          // Skip if we already have this message (dedup by id)
-          if (prev.some((m) => m.id === msg.id)) return prev;
+          if (prev.some((m) => m.id === msg.id)) return prev; // dedup
           return [...prev, msg];
         });
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
       }
 
-      // Update last message preview in conversation list
+      // Update last-message preview + unread count in conversation list
       setConversations((prev) =>
-        prev.map((c) =>
-          c.conversationId === msg.conversationId
-            ? { ...c, lastMessage: { id: msg.id, text: msg.text, senderId: msg.senderId, createdAt: msg.createdAt } }
-            : c,
-        ),
+        prev.map((c) => {
+          if (c.conversationId !== msg.conversationId) return c;
+          const isActiveConv = activeConvRef.current?.conversationId === msg.conversationId;
+          return {
+            ...c,
+            lastMessage: { id: msg.id, text: msg.text, senderId: msg.senderId, createdAt: msg.createdAt },
+            // Only increment row unread if the chat isn't currently open
+            unreadCount: isActiveConv ? 0 : c.unreadCount + 1,
+          };
+        }),
       );
     };
 
+    // Another participant deleted a message — remove it from the view
+    const handleMessageDeleted = ({ messageId }: { messageId: string }) => {
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    };
+
     socket.on("new-message", handleNewMessage);
+    socket.on("message-deleted", handleMessageDeleted);
 
     return () => {
       socket.off("new-message", handleNewMessage);
+      socket.off("message-deleted", handleMessageDeleted);
       disconnectMessagesSocket();
     };
   }, [accessToken]);
@@ -128,7 +164,16 @@ export default function MessagesPage() {
     setActiveConv(conv);
     activeConvRef.current = conv;
 
-    // Join the socket room so we receive new-message events for this conversation
+    // Decrement the global unread-messages badge by how many this conversation had
+    if (conv.unreadCount > 0) {
+      decrementMessages(conv.unreadCount);
+      // Optimistically clear unread on the row too
+      setConversations((prev) =>
+        prev.map((c) => c.conversationId === conv.conversationId ? { ...c, unreadCount: 0 } : c),
+      );
+    }
+
+    // Join the socket room so we receive new-message / message-deleted events
     if (accessToken) {
       const socket = connectMessagesSocket(accessToken);
       socket.emit("join-conversation", { conversationId: conv.conversationId });
@@ -144,12 +189,33 @@ export default function MessagesPage() {
     if (!text.trim() || !activeConv || !accessToken) return;
     const socket = connectMessagesSocket(accessToken);
     // Send via WebSocket — the gateway saves to DB and broadcasts new-message to the room
-    // (including back to the sender, so no optimistic add needed)
     socket.emit("send-message", {
       conversationId: activeConv.conversationId,
       text: text.trim(),
     });
     setText("");
+  }
+
+  async function deleteConversation(conversationId: string) {
+    setConvMenu(null);
+    try {
+      await api.delete(`/messages/${conversationId}`);
+      setConversations((prev) => prev.filter((c) => c.conversationId !== conversationId));
+      if (activeConv?.conversationId === conversationId) setActiveConv(null);
+    } catch {
+      toast("Failed to delete conversation", "error");
+    }
+  }
+
+  async function deleteMessage(messageId: string) {
+    if (!activeConv) return;
+    try {
+      await api.delete(`/messages/${activeConv.conversationId}/messages/${messageId}`);
+      // Remove from local state immediately (socket broadcast handles other party's view)
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    } catch {
+      toast("Failed to delete message", "error");
+    }
   }
 
   // Show nothing until Zustand has read from localStorage — prevents flash of "Please log in"
@@ -172,7 +238,7 @@ export default function MessagesPage() {
       </div>
 
       <div className="flex w-full max-w-[900px] border-r border-border min-h-screen">
-        {/* Conversation list */}
+        {/* ── Conversation list ─────────────────────────────────────── */}
         <div className={cn(
           "flex flex-col border-r border-border",
           activeConv ? "hidden lg:flex w-[340px]" : "flex-1 lg:w-[340px] lg:flex-none",
@@ -187,41 +253,78 @@ export default function MessagesPage() {
             <div className="p-6 text-center text-sm text-muted-foreground">No conversations yet</div>
           ) : (
             conversations.map((conv) => (
-              <button key={conv.conversationId} onClick={() => openConversation(conv)}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-4 border-b border-border hover:bg-foreground/5 transition-colors text-left w-full",
-                  conv.unreadCount > 0 && "bg-foreground/5",
-                  activeConv?.conversationId === conv.conversationId && "bg-secondary",
-                )}>
-                <Avatar
-                  src={conv.participant?.avatarUrl ?? null}
-                  alt={conv.participant?.displayName ?? "Unknown"}
-                  size={44}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-baseline">
-                    <p className={cn("text-sm font-medium text-foreground", conv.unreadCount > 0 && "font-bold")}>
-                      {conv.participant?.displayName ?? "Unknown"}
+              /* Wrap in a relative container so the menu can be absolutely positioned */
+              <div key={conv.conversationId} className="relative group">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openConversation(conv)}
+                  onKeyDown={(e) => e.key === "Enter" && openConversation(conv)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-4 border-b border-border hover:bg-foreground/5 transition-colors cursor-pointer",
+                    conv.unreadCount > 0 && "bg-foreground/5",
+                    activeConv?.conversationId === conv.conversationId && "bg-secondary",
+                  )}
+                >
+                  <Avatar
+                    src={conv.participant?.avatarUrl ?? null}
+                    alt={conv.participant?.displayName ?? "Unknown"}
+                    size={44}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-baseline">
+                      <p className={cn("text-sm font-medium text-foreground", conv.unreadCount > 0 && "font-bold")}>
+                        {conv.participant?.displayName ?? "Unknown"}
+                      </p>
+                      {conv.lastMessage && (
+                        <span className="text-xs text-muted-foreground mr-6">
+                          {relativeTime(conv.lastMessage.createdAt)}
+                        </span>
+                      )}
+                    </div>
+                    <p className={cn("text-xs truncate text-muted-foreground pr-6", conv.unreadCount > 0 && "text-foreground font-medium")}>
+                      {conv.lastMessage?.text ?? "No messages yet"}
                     </p>
-                    {conv.lastMessage && (
-                      <span className="text-xs text-muted-foreground">{relativeTime(conv.lastMessage.createdAt)}</span>
-                    )}
                   </div>
-                  <p className={cn("text-xs truncate text-muted-foreground", conv.unreadCount > 0 && "text-foreground font-medium")}>
-                    {conv.lastMessage?.text ?? "No messages yet"}
-                  </p>
+                  {conv.unreadCount > 0 && (
+                    <span className="min-w-[18px] h-[18px] px-1 text-[10px] font-bold bg-[#0095f6] text-white rounded-full flex items-center justify-center flex-shrink-0">
+                      {conv.unreadCount}
+                    </span>
+                  )}
                 </div>
-                {conv.unreadCount > 0 && (
-                  <span className="min-w-[18px] h-[18px] px-1 text-[10px] font-bold bg-[#0095f6] text-white rounded-full flex items-center justify-center flex-shrink-0">
-                    {conv.unreadCount}
-                  </span>
+
+                {/* Three-dot menu trigger — appears on row hover */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConvMenu((prev) => prev === conv.conversationId ? null : conv.conversationId);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 rounded-full hover:bg-foreground/10 text-muted-foreground transition-opacity"
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+
+                {/* Dropdown menu */}
+                {convMenu === conv.conversationId && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute right-3 top-full z-50 mt-1 min-w-[160px] rounded-xl border border-border bg-background shadow-lg overflow-hidden"
+                  >
+                    <button
+                      onClick={() => deleteConversation(conv.conversationId)}
+                      className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-red-500 hover:bg-foreground/5 transition-colors"
+                    >
+                      <Trash2 size={15} />
+                      Delete chat
+                    </button>
+                  </div>
                 )}
-              </button>
+              </div>
             ))
           )}
         </div>
 
-        {/* Chat view */}
+        {/* ── Chat view ─────────────────────────────────────────────── */}
         {activeConv ? (
           <div className="flex-1 flex flex-col">
             {/* Chat header */}
@@ -229,12 +332,18 @@ export default function MessagesPage() {
               <button onClick={() => setActiveConv(null)} className="lg:hidden text-foreground hover:text-muted-foreground">
                 <ChevronLeft size={24} />
               </button>
-              <Avatar
-                src={activeConv.participant?.avatarUrl ?? null}
-                alt={activeConv.participant?.displayName ?? "Unknown"}
-                size={32}
-              />
-              <span className="font-semibold text-foreground">{activeConv.participant?.displayName ?? "Unknown"}</span>
+              {/* Clicking the avatar or name navigates to the participant's profile */}
+              <Link
+                href={activeConv.participant ? `/${activeConv.participant.username}` : "#"}
+                className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+              >
+                <Avatar
+                  src={activeConv.participant?.avatarUrl ?? null}
+                  alt={activeConv.participant?.displayName ?? "Unknown"}
+                  size={32}
+                />
+                <span className="font-semibold text-foreground">{activeConv.participant?.displayName ?? "Unknown"}</span>
+              </Link>
             </div>
 
             {/* Messages */}
@@ -242,10 +351,29 @@ export default function MessagesPage() {
               {messages.map((msg) => {
                 const isMe = msg.sender.id === user.id;
                 return (
-                  <div key={msg.id} className={cn("flex items-end gap-2", isMe ? "flex-row-reverse" : "flex-row")}>
+                  <div
+                    key={msg.id}
+                    className={cn("flex items-end gap-2 group/msg", isMe ? "flex-row-reverse" : "flex-row")}
+                    onMouseEnter={() => isMe && setHoveredMsg(msg.id)}
+                    onMouseLeave={() => setHoveredMsg(null)}
+                  >
                     {!isMe && <Avatar src={msg.sender.avatarUrl} alt={msg.sender.displayName} size={28} />}
+
+                    {/* Delete button — only visible on own messages while hovered */}
+                    {isMe && (
+                      <button
+                        onClick={() => deleteMessage(msg.id)}
+                        className={cn(
+                          "flex-shrink-0 p-1.5 rounded-full text-muted-foreground hover:text-red-500 hover:bg-foreground/10 transition-all",
+                          hoveredMsg === msg.id ? "opacity-100" : "opacity-0 pointer-events-none",
+                        )}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+
                     <div className={cn(
-                      "max-w-[80%] px-4 py-3 text-[15px] leading-relaxed",
+                      "max-w-[70%] px-4 py-3 text-[15px] leading-relaxed",
                       isMe
                         ? "bg-primary text-primary-foreground rounded-tl-2xl rounded-bl-2xl rounded-tr-sm rounded-br-2xl"
                         : "bg-secondary text-foreground rounded-tr-2xl rounded-br-2xl rounded-tl-sm rounded-bl-2xl",

@@ -76,6 +76,7 @@ export default function SavedPage() {
                 key={t.id}
                 thread={t}
                 onDelete={handleDelete}
+                onUnsave={handleUnsave}
               />
             ))}
             {hasMore && (

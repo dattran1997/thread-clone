@@ -2,10 +2,16 @@ import {
   Injectable, NotFoundException, ConflictException, BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
+import { NotificationsService } from "../notifications/notifications.service";
+import { NotificationsGateway } from "../notifications/notifications.gateway";
 
 @Injectable()
 export class FollowsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+    private gateway: NotificationsGateway,
+  ) {}
 
   async follow(followerId: string, followingId: string) {
     if (followerId === followingId) throw new BadRequestException("Cannot follow yourself");
@@ -31,6 +37,15 @@ export class FollowsService {
         where: { id: followingId },
         data: { followerCount: { increment: 1 } },
       });
+
+      // Notify the followed user
+      this.notificationsService.create({
+        recipientId: followingId,
+        actorId: followerId,
+        type: "FOLLOW",
+        entityId: followerId,
+        entityType: "user",
+      }).then((n) => this.gateway.emitToUser(followingId, "notification", n)).catch(() => {});
     }
 
     return { followingId, status };

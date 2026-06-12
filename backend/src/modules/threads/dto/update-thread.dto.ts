@@ -19,4 +19,11 @@ export class UpdateThreadDto {
   @IsArray()
   @IsString({ each: true })
   hashtags?: string[];
+
+  /** Full replacement list of media IDs to keep (plus any newly uploaded ones) */
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  mediaIds?: string[];
 }

@@ -18,8 +18,17 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // SSR default = dark; ThemeProvider overrides client-side via .dark class
-    <html lang="en" className="dark">
+    // suppressHydrationWarning: the inline script mutates className before React hydrates
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Runs synchronously before first paint — reads localStorage and applies theme
+            so there is zero flash and no dependency on Zustand rehydration timing. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=JSON.parse(localStorage.getItem('threads-theme')||'{}');var t=(s.state&&s.state.theme)||'dark';var r=document.documentElement;r.classList.remove('dark');r.removeAttribute('data-theme');if(t==='dark')r.classList.add('dark');else if(t==='warm')r.setAttribute('data-theme','warm');}catch(e){document.documentElement.classList.add('dark');}})();`,
+          }}
+        />
+      </head>
       <body className="min-h-screen bg-background text-foreground antialiased">
         <ThemeProvider>
           <WsProvider />

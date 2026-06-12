@@ -24,6 +24,9 @@ export default function HomePage() {
   const [hasMore, setHasMore] = useState(false);
   const [showPill, setShowPill] = useState(false);
   const pillTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tabSwitchTimeRef = useRef<number>(Date.now()); // tracks when the last tab switch started
+  const fetchIdRef = useRef(0);                         // drops stale responses from previous tab
   const observerRef = useRef<IntersectionObserver | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const isAuthenticated = !!user;
@@ -31,25 +34,80 @@ export default function HomePage() {
   const fetchFeed = useCallback(async (reset = false) => {
     if (!isAuthenticated) { setLoading(false); return; }
     setLoading(true);
+
+    const myFetchId = ++fetchIdRef.current;
+
     try {
       const endpoint = tab === "for-you" ? "/feed/for-you" : "/feed/following";
       const params = !reset && cursor ? `?cursor=${cursor}` : "";
       const res = await api.get<{ data: Thread[]; nextCursor: string | null; hasMore: boolean }>(
         endpoint + params,
       );
-      setThreads((prev) => reset ? res.data : [...prev, ...res.data]);
-      setCursor(res.nextCursor);
-      setHasMore(res.hasMore);
-    } catch {}
-    setTimeout(() => setLoading(false), reset ? 650 : 0);
+
+      // Drop stale response if the user switched tabs while this request was in-flight
+      if (myFetchId !== fetchIdRef.current) return;
+
+      if (reset) {
+        // Guarantee the skeleton stays visible for at least 650 ms from the moment the tab switched.
+        // If the network was slow (> 650 ms), show data immediately; otherwise wait out the remainder.
+        const elapsed = Date.now() - tabSwitchTimeRef.current;
+        const delay = Math.max(0, 650 - elapsed);
+        if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+        loadingTimerRef.current = setTimeout(() => {
+          if (myFetchId !== fetchIdRef.current) return; // guard again inside timer
+          setThreads(res.data);
+          setCursor(res.nextCursor);
+          setHasMore(res.hasMore);
+          setLoading(false);
+        }, delay);
+      } else {
+        // Load-more: append immediately, no minimum delay
+        setThreads((prev) => [...prev, ...res.data]);
+        setCursor(res.nextCursor);
+        setHasMore(res.hasMore);
+        setLoading(false);
+      }
+    } catch {
+      if (myFetchId !== fetchIdRef.current) return;
+      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = setTimeout(() => setLoading(false), 0);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, cursor, isAuthenticated]);
 
+  // Called from the tab button onClick so state clears in the SAME render as the tab change.
+  // This prevents one render where old threads briefly show under the new tab label.
+  function switchTab(newTab: FeedTab) {
+    if (newTab === tab) return;
+    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+    tabSwitchTimeRef.current = Date.now();
+    setTab(newTab);
+    setThreads([]);
+    setCursor(null);
+    setHasMore(false);
+    setShowPill(false);
+    setLoading(true);
+  }
+
   useEffect(() => {
-    setThreads([]); setCursor(null); setHasMore(false); setShowPill(false);
+    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+    // Also reset time here to cover the isAuthenticated-change path (login/logout)
+    tabSwitchTimeRef.current = Date.now();
+    setThreads([]); setCursor(null); setHasMore(false); setShowPill(false); setLoading(true);
     fetchFeed(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, isAuthenticated]);
+
+  // Thread posted from the global ComposeSheet modal — prepend instantly to the feed
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const thread = (e as CustomEvent).detail;
+      if (!thread) return;
+      setThreads((prev) => [thread, ...prev]);
+    };
+    window.addEventListener("thread-composed", handler);
+    return () => window.removeEventListener("thread-composed", handler);
+  }, []);
 
   // "See new posts" pill after 5s idle
   useEffect(() => {
@@ -97,7 +155,7 @@ export default function HomePage() {
         {/* Tab bar */}
         <div className="sticky top-14 md:top-0 z-20 flex border-b border-border bg-background/90 backdrop-blur-xl">
           {(["for-you", "following"] as FeedTab[]).map((t) => (
-            <button key={t} onClick={() => setTab(t)}
+            <button key={t} onClick={() => switchTab(t)}
               className={cn(
                 "relative flex-1 py-4 text-[15px] font-medium transition-colors",
                 tab === t ? "text-foreground" : "text-muted-foreground hover:text-foreground",

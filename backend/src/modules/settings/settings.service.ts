@@ -7,11 +7,15 @@ import {
 } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../../prisma/prisma.service";
+import { NotificationsGateway } from "../notifications/notifications.gateway";
 import { UpdateSettingsDto, ChangePasswordDto, ChangeEmailDto } from "./dto/settings.dto";
 
 @Injectable()
 export class SettingsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: NotificationsGateway,
+  ) {}
 
   async getSettings(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -95,13 +99,18 @@ export class SettingsService {
   }
 
   // ── Sessions (Login Activity) ──────────────────────────────────────────────
-  async getSessions(userId: string) {
+  async getSessions(userId: string, currentSessionId?: string) {
     const sessions = await this.prisma.session.findMany({
       where: { userId, expiresAt: { gt: new Date() } },
       select: { id: true, createdAt: true, expiresAt: true },
       orderBy: { createdAt: "desc" },
     });
-    return { sessions };
+    return {
+      sessions: sessions.map((s) => ({
+        ...s,
+        isCurrent: s.id === currentSessionId,
+      })),
+    };
   }
 
   async revokeSession(userId: string, sessionId: string) {
@@ -109,6 +118,8 @@ export class SettingsService {
     await this.prisma.session.deleteMany({
       where: { id: sessionId, userId },
     });
+    // Notify the device that owns this session to log out immediately
+    this.gateway.emitToSession(sessionId, "session_revoked", {});
     return { success: true };
   }
 

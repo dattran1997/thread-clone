@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { Logo } from "@/components/shell/Logo";
@@ -11,23 +11,40 @@ export default function VerifyEmailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  const emailParam = searchParams.get("email") ?? "";
 
   const [status, setStatus] = useState<Status>(token ? "verifying" : "idle");
   const [errorMsg, setErrorMsg] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(emailParam);
   const [resending, setResending] = useState(false);
   const [resendDone, setResendDone] = useState(false);
+  const [countdown, setCountdown] = useState(3);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!token) return;
     api
       .post<{ message: string }>("/auth/verify-email", { token })
-      .then(() => setStatus("success"))
+      .then(() => {
+        setStatus("success");
+        // Auto-redirect to login after 3s countdown
+        countdownRef.current = setInterval(() => {
+          setCountdown((c) => {
+            if (c <= 1) {
+              clearInterval(countdownRef.current!);
+              router.replace("/login?verified=1");
+              return 0;
+            }
+            return c - 1;
+          });
+        }, 1000);
+      })
       .catch((err: any) => {
         setStatus("error");
         setErrorMsg(err?.message ?? "Verification failed");
       });
-  }, [token]);
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+  }, [token, router]);
 
   async function handleResend(e: React.FormEvent) {
     e.preventDefault();
@@ -63,11 +80,14 @@ export default function VerifyEmailPage() {
           <CheckCircle size={48} className="text-green-500" />
           <h2 className="text-[22px] font-bold text-foreground">Email verified!</h2>
           <p className="text-[14px] text-muted-foreground">Your account is now fully active.</p>
+          <p className="text-[13px] text-muted-foreground">
+            Redirecting to login in <span className="font-semibold text-foreground">{countdown}</span>s…
+          </p>
           <button
-            onClick={() => router.replace("/login")}
+            onClick={() => { clearInterval(countdownRef.current!); router.replace("/login?verified=1"); }}
             className="mt-2 w-full py-4 rounded-xl bg-primary text-primary-foreground font-bold text-[15px] hover:opacity-90 transition-opacity"
           >
-            Log in
+            Go to login now
           </button>
         </div>
       )}
@@ -100,13 +120,13 @@ export default function VerifyEmailPage() {
               Click the link to activate your account.
             </p>
             <p className="text-[13px] text-muted-foreground rounded-xl bg-secondary px-4 py-3">
-              <strong>Running locally?</strong> Check the backend console — the link is printed there.
+              Check your spam folder if you don't see it within a few minutes.
             </p>
           </div>
 
           {resendDone ? (
             <p className="text-center text-[14px] text-green-500 font-medium">
-              New link sent — check your email or console.
+              New link sent — check your inbox.
             </p>
           ) : (
             <form onSubmit={handleResend} className="flex flex-col gap-2">

@@ -321,7 +321,7 @@ model Hashtag {
 model ThreadHashtag {
   threadId  String
   hashtagId String
-  thread    Thread  @relation(fields: [threadId],  references: [id])
+  thread    Thread  @relation(fields: [threadId],  references: [id], onDelete: Cascade)
   hashtag   Hashtag @relation(fields: [hashtagId], references: [id])
 
   @@id([threadId, hashtagId])
@@ -350,6 +350,7 @@ model Notification {
   type        NotificationType
   entityId    String
   entityType  String
+  preview     String?
   readAt      DateTime?
   createdAt   DateTime         @default(now())
 
@@ -372,7 +373,7 @@ model DmConversation {
 model DmParticipant {
   conversationId String
   userId         String
-  conversation   DmConversation @relation(fields: [conversationId], references: [id])
+  conversation   DmConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user           User           @relation(fields: [userId],         references: [id])
   unreadCount    Int            @default(0)
 
@@ -383,7 +384,7 @@ model DmMessage {
   id             String         @id @default(cuid())
   conversationId String
   senderId       String
-  conversation   DmConversation @relation(fields: [conversationId], references: [id])
+  conversation   DmConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User           @relation(fields: [senderId],       references: [id])
   text           String
   createdAt      DateTime       @default(now())

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { toast } from "@/components/ui/Toast";
@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 import { Image, List, Hash, Ghost, X, Loader2, Mic, MicOff, ChevronDown, Globe, Users, AtSign } from "lucide-react";
 
 const MAX_CHARS = 500;
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
 
 interface MediaItem {
   localId: string;       // stable key for React
@@ -37,6 +36,14 @@ export function Composer({ parentId, onSuccess, placeholder, autoFocus = false }
   const [loading, setLoading] = useState(false);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grow textarea height as content grows
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -72,24 +79,10 @@ export function Composer({ parentId, onSuccess, placeholder, autoFocus = false }
 
   // ── Upload a single file to the backend ────────────────────────────────────
   async function uploadFile(item: MediaItem) {
-    // Read token the same way the api client does
-    let token: string | null = null;
-    try {
-      const stored = localStorage.getItem("threads-auth");
-      if (stored) token = JSON.parse(stored)?.state?.accessToken ?? null;
-    } catch {}
-
     const form = new FormData();
     form.append("file", item.file);
-
     try {
-      const res = await fetch(`${BASE}/media/upload`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: form,
-      });
-      if (!res.ok) throw new Error("Upload failed");
-      const data: { id: string; url: string; type: string } = await res.json();
+      const data = await api.upload<{ id: string; url: string; type: string }>("/media/upload", form);
       setMediaItems((prev) =>
         prev.map((m) => m.localId === item.localId
           ? { ...m, serverId: data.id, uploading: false }
@@ -238,11 +231,16 @@ export function Composer({ parentId, onSuccess, placeholder, autoFocus = false }
           <textarea
             ref={textareaRef}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              // Hard-stop at max chars — don't allow typing past limit
+              if (val.length <= MAX_CHARS) setText(val);
+            }}
             onKeyDown={handleKeyDown}
             placeholder={placeholder ?? (parentId ? "Reply to thread…" : "What's new?")}
             autoFocus={autoFocus}
-            rows={parentId ? 2 : 1}
+            rows={1}
+            style={{ overflow: "hidden" }}
             className="w-full resize-none bg-transparent py-1 text-[15px] text-foreground placeholder:text-muted-foreground outline-none leading-relaxed"
           />
 

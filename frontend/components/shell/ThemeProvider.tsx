@@ -3,11 +3,9 @@ import { useEffect } from "react";
 import { useThemeStore } from "@/stores/theme";
 
 /**
- * Reads theme from Zustand (persisted to localStorage) and applies it to <html>.
- * Dark  → adds `.dark` class (enables dark: Tailwind variant)
- * Light → removes `.dark` class, no data-theme (uses :root defaults)
- * Warm  → removes `.dark` class, adds data-theme="warm"
- * Mount once in root layout.
+ * Keeps <html> in sync with the Zustand theme store after the page has loaded.
+ * The initial theme is applied synchronously by the inline script in layout.tsx
+ * (before first paint), so there is no flash on any route including /login.
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { theme } = useThemeStore();
@@ -22,7 +20,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } else if (theme === "warm") {
       root.setAttribute("data-theme", "warm");
     }
-    // light = bare :root styles
+    // light = bare :root styles (no class, no data-theme)
   }, [theme]);
 
   return <>{children}</>;

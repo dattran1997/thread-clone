@@ -119,12 +119,15 @@ export class MessagesService {
   }
 
   async startConversation(userId: string, recipientId: string) {
-    // Check if a conversation already exists between the two users
+    // Find a conversation where BOTH users are participants (and no one else)
     const existing = await this.prisma.dmConversation.findFirst({
       where: {
-        participants: {
-          every: { userId: { in: [userId, recipientId] } },
-        },
+        AND: [
+          { participants: { some: { userId } } },
+          { participants: { some: { userId: recipientId } } },
+          // Exclude conversations that have participants outside these two users
+          { participants: { none: { userId: { notIn: [userId, recipientId] } } } },
+        ],
       },
       include: {
         participants: {
@@ -137,13 +140,7 @@ export class MessagesService {
       },
     });
 
-    if (existing) {
-      // Verify both participants exist
-      const participantIds = existing.participants.map((p: { userId: string }) => p.userId);
-      if (participantIds.includes(userId) && participantIds.includes(recipientId)) {
-        return existing;
-      }
-    }
+    if (existing) return existing;
 
     // Ensure recipient exists
     const recipient = await this.prisma.user.findUnique({
@@ -170,11 +167,56 @@ export class MessagesService {
     });
   }
 
+  // ── Total unread DM count across all conversations ────────────────────────
+  async getUnreadTotal(userId: string) {
+    const result = await this.prisma.dmParticipant.aggregate({
+      where: { userId },
+      _sum: { unreadCount: true },
+    });
+    return { count: result._sum.unreadCount ?? 0 };
+  }
+
   async getConversationParticipants(conversationId: string): Promise<string[]> {
     const participants = await this.prisma.dmParticipant.findMany({
       where: { conversationId },
       select: { userId: true },
     });
     return participants.map((p: { userId: string }) => p.userId);
+  }
+
+  // ── Delete conversation (removes user's participant record; cleans up if empty) ─
+  async deleteConversation(conversationId: string, userId: string) {
+    const participant = await this.prisma.dmParticipant.findUnique({
+      where: { conversationId_userId: { conversationId, userId } },
+    });
+    if (!participant) throw new ForbiddenException("Not a participant in this conversation");
+
+    // Remove the user's participant record
+    await this.prisma.dmParticipant.delete({
+      where: { conversationId_userId: { conversationId, userId } },
+    });
+
+    // If no participants remain, delete the entire conversation (cascades to messages)
+    const remaining = await this.prisma.dmParticipant.count({ where: { conversationId } });
+    if (remaining === 0) {
+      await this.prisma.dmConversation.delete({ where: { id: conversationId } }).catch(() => {});
+    }
+
+    return { success: true };
+  }
+
+  // ── Delete a single message (sender only) ─────────────────────────────────
+  async deleteMessage(messageId: string, userId: string) {
+    const message = await this.prisma.dmMessage.findUnique({
+      where: { id: messageId },
+      select: { id: true, senderId: true, conversationId: true },
+    });
+    if (!message) throw new NotFoundException("Message not found");
+    if (message.senderId !== userId) {
+      throw new ForbiddenException("You can only delete your own messages");
+    }
+
+    await this.prisma.dmMessage.delete({ where: { id: messageId } });
+    return { conversationId: message.conversationId, messageId, success: true };
   }
 }

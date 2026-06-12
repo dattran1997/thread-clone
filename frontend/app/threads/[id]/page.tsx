@@ -28,7 +28,6 @@ export default function ThreadDetailPage() {
   // Live stats bar counts — kept separate so they can update without re-fetching
   const [likeCount, setLikeCount] = useState(0);
   const [repostCount, setRepostCount] = useState(0);
-  const [replyCount, setReplyCount] = useState(0);
 
   useEffect(() => {
     api.get<ThreadDetail>(`/threads/${id}/replies`)
@@ -36,7 +35,8 @@ export default function ThreadDetailPage() {
         setData(d);
         setLikeCount(d.thread.likeCount);
         setRepostCount(d.thread.repostCount);
-        setReplyCount(d.thread.replyCount);
+        // Count the view only when the user actually opens the thread detail page
+        api.post(`/threads/${id}/view`, {}).catch(() => {});
       })
       .catch(() => router.push("/"))
       .finally(() => setLoading(false));
@@ -46,21 +46,47 @@ export default function ThreadDetailPage() {
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as {
-        threadId: string; likeCount?: number; repostCount?: number; replyCount?: number;
+        threadId: string; likeCount?: number; repostCount?: number;
       };
       if (detail.threadId !== id) return;
       if (detail.likeCount   !== undefined) setLikeCount(detail.likeCount);
       if (detail.repostCount !== undefined) setRepostCount(detail.repostCount);
-      if (detail.replyCount  !== undefined) setReplyCount(detail.replyCount);
     };
     window.addEventListener("thread-updated", handler);
     return () => window.removeEventListener("thread-updated", handler);
   }, [id]);
 
+  // Real-time replies from other users — appended to the reply list as they arrive
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { threadId: string; reply: Thread };
+      if (detail.threadId !== id) return;
+      // Guard against appending a reply the current user just posted (handleReply already did it)
+      setData((prev) => {
+        if (!prev) return null;
+        if (prev.replies.some((r) => r.id === detail.reply.id)) return prev; // dedup
+        return {
+          ...prev,
+          thread: { ...prev.thread, replyCount: prev.thread.replyCount + 1 },
+          replies: [...prev.replies, detail.reply],
+        };
+      });
+    };
+    window.addEventListener("thread-new-reply", handler);
+    return () => window.removeEventListener("thread-new-reply", handler);
+  }, [id]);
+
   function handleReply(reply: Thread) {
-    setData((prev) => prev ? { ...prev, replies: [...prev.replies, reply] } : null);
-    // Increment locally — the socket broadcast will confirm the true count shortly after
-    setReplyCount((c) => c + 1);
+    setData((prev) => {
+      if (!prev) return null;
+      // Guard: the socket's new-reply event may have already added this reply
+      if (prev.replies.some((r) => r.id === reply.id)) return prev;
+      return {
+        ...prev,
+        thread: { ...prev.thread, replyCount: prev.thread.replyCount + 1 },
+        replies: [...prev.replies, reply],
+      };
+    });
   }
 
   return (
@@ -94,7 +120,6 @@ export default function ThreadDetailPage() {
             <div className="flex gap-6 px-4 py-3 border-b border-border text-sm text-muted-foreground">
               <span><strong className="text-foreground">{repostCount}</strong> reposts</span>
               <span><strong className="text-foreground">{likeCount}</strong> likes</span>
-              <span><strong className="text-foreground">{replyCount}</strong> replies</span>
             </div>
 
             {/* Reply composer */}

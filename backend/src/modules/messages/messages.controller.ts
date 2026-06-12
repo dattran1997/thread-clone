@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Param,
   Body,
   Query,
@@ -10,6 +11,7 @@ import {
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { MessagesService } from "./messages.service";
+import { MessagesGateway } from "./messages.gateway";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { SendMessageDto, StartConversationDto } from "./dto/messages.dto";
 
@@ -17,7 +19,10 @@ import { SendMessageDto, StartConversationDto } from "./dto/messages.dto";
 @ApiBearerAuth()
 @Controller("messages")
 export class MessagesController {
-  constructor(private messagesService: MessagesService) {}
+  constructor(
+    private messagesService: MessagesService,
+    private messagesGateway: MessagesGateway,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: "List DM conversations for current user" })
@@ -27,6 +32,12 @@ export class MessagesController {
     @Query("limit", new DefaultValuePipe(20), ParseIntPipe) limit?: number,
   ) {
     return this.messagesService.getConversations(user.id, cursor, limit);
+  }
+
+  @Get("unread-total")
+  @ApiOperation({ summary: "Total unread DM count across all conversations" })
+  getUnreadTotal(@CurrentUser() user: { id: string }) {
+    return this.messagesService.getUnreadTotal(user.id);
   }
 
   @Post("start")
@@ -57,5 +68,27 @@ export class MessagesController {
     @Body() dto: SendMessageDto,
   ) {
     return this.messagesService.sendMessage(conversationId, user.id, dto.text);
+  }
+
+  @Delete(":conversationId")
+  @ApiOperation({ summary: "Delete a conversation (removes user from participants)" })
+  deleteConversation(
+    @CurrentUser() user: { id: string },
+    @Param("conversationId") conversationId: string,
+  ) {
+    return this.messagesService.deleteConversation(conversationId, user.id);
+  }
+
+  @Delete(":conversationId/messages/:messageId")
+  @ApiOperation({ summary: "Delete a message (sender only)" })
+  async deleteMessage(
+    @CurrentUser() user: { id: string },
+    @Param("conversationId") conversationId: string,
+    @Param("messageId") messageId: string,
+  ) {
+    const result = await this.messagesService.deleteMessage(messageId, user.id);
+    // Broadcast deletion to all participants currently in the conversation room
+    this.messagesGateway.emitMessageDeleted(conversationId, messageId);
+    return result;
   }
 }
