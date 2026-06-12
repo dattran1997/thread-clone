@@ -22,7 +22,8 @@ export class FeedService {
       where: { followerId: userId, status: "ACCEPTED" },
       select: { followingId: true },
     });
-    const authorIds = following.map((f) => f.followingId);
+    // Include the user's own posts so they see what they've posted
+    const authorIds = [userId, ...following.map((f) => f.followingId)];
 
     if (!authorIds.length) {
       return { data: [], nextCursor: null, hasMore: false };
@@ -65,7 +66,7 @@ export class FeedService {
         isDraft: false,
         scheduledAt: null,
         parentId: null,
-        authorId: { not: userId },
+        // Include everyone's posts (including the current user's own posts)
       },
       take: limit + 1,
       ...(cursor && { cursor: { id: cursor }, skip: 1 }),
