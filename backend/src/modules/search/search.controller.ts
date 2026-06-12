@@ -16,6 +16,13 @@ import { CurrentUser } from "../../common/decorators/current-user.decorator";
 export class SearchController {
   constructor(private searchService: SearchService) {}
 
+  @Get("trending")
+  @Public()
+  @ApiOperation({ summary: "Get top trending hashtags" })
+  getTrending() {
+    return this.searchService.getTrending();
+  }
+
   @Get()
   @Public()
   @ApiOperation({ summary: "Search users, threads, or tags" })

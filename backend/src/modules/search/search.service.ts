@@ -110,4 +110,14 @@ export class SearchService {
       hasMore,
     };
   }
+
+  async getTrending(limit = 5) {
+    const tags = await this.prisma.hashtag.findMany({
+      where: { threadCount: { gt: 0 } },
+      orderBy: { threadCount: "desc" },
+      take: limit,
+      select: { tag: true, threadCount: true },
+    });
+    return tags;
+  }
 }

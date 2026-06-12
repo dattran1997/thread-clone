@@ -4,38 +4,68 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { DesktopSidebar } from "@/components/shell/DesktopSidebar";
 import { MobileNav } from "@/components/shell/MobileNav";
-import { fmtN } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { fmtN, cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
 type Range = "7d" | "30d" | "90d";
 
 interface Summary {
-  totalViews: number; viewsDelta: number;
-  totalLikes: number; likesDelta: number;
-  totalReplies: number; repliesDelta: number;
-  totalReposts: number; repostsDelta: number;
-  followerCount: number; followerDelta: number;
+  period: string;
+  threadCount: number;
+  followerCount: number;
+  current: {
+    likeCount: number;
+    replyCount: number;
+    repostCount: number;
+    quoteCount: number;
+    viewCount: number;
+  };
+  previous: {
+    likeCount: number;
+    replyCount: number;
+    repostCount: number;
+    quoteCount: number;
+    viewCount: number;
+  };
+  changes: {
+    likes: number;
+    replies: number;
+    reposts: number;
+    views: number;
+  };
 }
 
-interface ChartPoint { date: string; value: number; }
-interface Chart { range: Range; views: ChartPoint[]; likes: ChartPoint[]; replies: ChartPoint[]; reposts: ChartPoint[]; }
+interface ChartPoint {
+  date: string;
+  views: number;
+  likes: number;
+  replies: number;
+  reposts: number;
+}
 
 function Delta({ value }: { value: number }) {
   const pos = value >= 0;
   return (
     <span className={cn("text-xs font-medium", pos ? "text-green-500" : "text-red-500")}>
-      {pos ? "+" : ""}{fmtN(value)}
+      {pos ? "+" : ""}{value}%
     </span>
   );
 }
 
-function StatCard({ label, value, delta }: { label: string; value: number; delta: number }) {
+function StatCard({
+  label,
+  value,
+  delta,
+}: {
+  label: string;
+  value: number;
+  delta?: number;
+}) {
   return (
     <div className="p-4 rounded-xl bg-secondary space-y-1">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-2xl font-bold text-foreground">{fmtN(value)}</p>
-      <Delta value={delta} />
+      {delta !== undefined && <Delta value={delta} />}
     </div>
   );
 }
@@ -43,20 +73,29 @@ function StatCard({ label, value, delta }: { label: string; value: number; delta
 export default function InsightsPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [chart, setChart] = useState<Chart | null>(null);
+  const [chart, setChart] = useState<ChartPoint[]>([]);
   const [range, setRange] = useState<Range>("7d");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!user) { router.push("/login"); return; }
     setLoading(true);
     Promise.all([
       api.get<Summary>("/insights"),
-      api.get<Chart>(`/insights/chart?range=${range}`),
-    ]).then(([s, c]) => { setSummary(s); setChart(c); })
+      api.get<ChartPoint[]>(`/insights/chart?range=${range}`),
+    ])
+      .then(([s, c]) => {
+        setSummary(s);
+        setChart(c);
+      })
+      .catch(() => {})
       .finally(() => setLoading(false));
-  }, [user, range, router]);
+  }, [user, hasHydrated, range, router]);
+
+  if (!hasHydrated) return <div className="flex min-h-screen bg-background" />;
 
   return (
     <div className="flex min-h-screen w-full justify-center bg-background text-foreground transition-colors duration-200">
@@ -75,45 +114,54 @@ export default function InsightsPage() {
           <div className="p-4 space-y-6">
             {/* Summary cards */}
             <section>
-              <h2 className="font-semibold text-foreground mb-3">Overview</h2>
+              <h2 className="font-semibold text-foreground mb-3">
+                Overview · last {summary.period}
+              </h2>
               <div className="grid grid-cols-2 gap-3">
-                <StatCard label="Views" value={summary.totalViews} delta={summary.viewsDelta} />
-                <StatCard label="Likes" value={summary.totalLikes} delta={summary.likesDelta} />
-                <StatCard label="Replies" value={summary.totalReplies} delta={summary.repliesDelta} />
-                <StatCard label="Reposts" value={summary.totalReposts} delta={summary.repostsDelta} />
-                <StatCard label="Followers" value={summary.followerCount} delta={summary.followerDelta} />
+                <StatCard label="Views"     value={summary.current.viewCount}   delta={summary.changes.views}   />
+                <StatCard label="Likes"     value={summary.current.likeCount}   delta={summary.changes.likes}   />
+                <StatCard label="Replies"   value={summary.current.replyCount}  delta={summary.changes.replies} />
+                <StatCard label="Reposts"   value={summary.current.repostCount} delta={summary.changes.reposts} />
+                <StatCard label="Followers" value={summary.followerCount} />
+                <StatCard label="Threads"   value={summary.threadCount} />
               </div>
             </section>
 
-            {/* Range selector */}
+            {/* Range selector + bar chart */}
             <section>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-semibold text-foreground">Performance</h2>
                 <div className="flex gap-1">
                   {(["7d", "30d", "90d"] as Range[]).map((r) => (
-                    <button key={r} onClick={() => setRange(r)}
+                    <button
+                      key={r}
+                      onClick={() => setRange(r)}
                       className={cn(
                         "px-3 py-1 rounded-full text-xs font-medium transition-colors",
                         range === r
                           ? "bg-primary text-primary-foreground"
                           : "bg-secondary text-muted-foreground hover:bg-foreground/10",
-                      )}>
+                      )}
+                    >
                       {r}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Simple bar chart for views */}
-              {chart && (
+              {chart.length > 0 && (
                 <div className="bg-secondary rounded-xl p-4">
                   <p className="text-xs text-muted-foreground mb-3">Views over time</p>
                   <div className="flex items-end gap-1 h-32">
-                    {chart.views.map((p) => {
-                      const maxVal = Math.max(...chart.views.map((v) => v.value), 1);
-                      const heightPct = (p.value / maxVal) * 100;
+                    {chart.map((p) => {
+                      const maxVal = Math.max(...chart.map((v) => v.views), 1);
+                      const heightPct = (p.views / maxVal) * 100;
                       return (
-                        <div key={p.date} className="flex-1 flex flex-col items-center gap-1">
+                        <div
+                          key={p.date}
+                          title={`${p.date}: ${fmtN(p.views)} views`}
+                          className="flex-1 flex flex-col items-center"
+                        >
                           <div
                             className="w-full rounded-t bg-primary opacity-80 min-h-[2px]"
                             style={{ height: `${heightPct}%` }}
@@ -126,7 +174,9 @@ export default function InsightsPage() {
               )}
             </section>
           </div>
-        ) : null}
+        ) : (
+          <div className="p-6 text-center text-muted-foreground text-sm">No data yet — start posting!</div>
+        )}
       </main>
 
       <div className="md:hidden"><MobileNav /></div>

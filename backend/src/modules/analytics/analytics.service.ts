@@ -48,9 +48,14 @@ export class AnalyticsService {
       return Math.round(((curr - prev) / prev) * 100);
     };
 
+    const followerCount = await this.prisma.follow.count({
+      where: { followingId: userId, status: "ACCEPTED" },
+    });
+
     return {
       period: `${periodDays}d`,
       threadCount: threads.length,
+      followerCount,
       current: currentTotals,
       previous: previousTotals,
       changes: {
