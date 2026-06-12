@@ -297,6 +297,7 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
   const [likeCount, setLikeCount] = useState(thread.likeCount);
   const [reposted, setReposted] = useState(thread.isReposted);
   const [repostCount, setRepostCount] = useState(thread.repostCount);
+  const [replyCount, setReplyCount] = useState(thread.replyCount);
   const [saved, setSaved] = useState(thread.isSaved);
   const [poll, setPoll] = useState(thread.poll);
   const [heartBurst, setHeartBurst] = useState(false);
@@ -323,6 +324,7 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
       if (detail.threadId !== thread.id) return;
       if (detail.likeCount !== undefined) setLikeCount(detail.likeCount);
       if (detail.repostCount !== undefined) setRepostCount(detail.repostCount);
+      if (detail.replyCount !== undefined) setReplyCount(detail.replyCount);
     };
     window.addEventListener("thread-updated", handler);
 
@@ -551,7 +553,7 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
                 <Link href={`/threads/${thread.id}`}
                   className="flex items-center gap-1.5 transition-colors hover:text-foreground">
                   <MessageCircle size={20} />
-                  <span className="text-[13px]">{fmtN(thread.replyCount)}</span>
+                  <span className="text-[13px]">{fmtN(replyCount)}</span>
                 </Link>
 
                 {/* Repost */}

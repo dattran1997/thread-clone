@@ -2,6 +2,7 @@ import {
   Injectable, NotFoundException, ForbiddenException, UnprocessableEntityException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
+import { NotificationsGateway } from "../notifications/notifications.gateway";
 import { CreateThreadDto } from "./dto/create-thread.dto";
 import { UpdateThreadDto } from "./dto/update-thread.dto";
 
@@ -77,7 +78,10 @@ function makeSelect(viewerId?: string) {
 
 @Injectable()
 export class ThreadsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: NotificationsGateway,
+  ) {}
 
   // ── Create ─────────────────────────────────────────────────────────────────
   async create(userId: string, dto: CreateThreadDto) {
@@ -145,12 +149,14 @@ export class ThreadsService {
       }
     }
 
-    // Increment parent reply count
+    // Increment parent reply count and broadcast to live viewers
     if (dto.parentId) {
-      await this.prisma.thread.update({
+      const updated = await this.prisma.thread.update({
         where: { id: dto.parentId },
         data: { replyCount: { increment: 1 } },
+        select: { likeCount: true, repostCount: true, replyCount: true },
       });
+      this.gateway.emitThreadUpdate(dto.parentId, updated);
     }
 
     return this.fetchFull(thread.id, userId);
@@ -229,12 +235,14 @@ export class ThreadsService {
       data: { status: "DELETED" },
     });
 
-    // Decrement parent reply count
+    // Decrement parent reply count and broadcast to live viewers
     if (thread.parentId) {
-      await this.prisma.thread.update({
+      this.prisma.thread.update({
         where: { id: thread.parentId },
         data: { replyCount: { decrement: 1 } },
-      }).catch(() => {});
+        select: { likeCount: true, repostCount: true, replyCount: true },
+      }).then((updated) => this.gateway.emitThreadUpdate(thread.parentId!, updated))
+        .catch(() => {});
     }
   }
 
