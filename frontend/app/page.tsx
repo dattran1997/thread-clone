@@ -16,6 +16,7 @@ type FeedTab = "for-you" | "following";
 
 export default function HomePage() {
   const user = useAuthStore((s) => s.user);
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
   const [tab, setTab] = useState<FeedTab>("for-you");
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,7 +128,10 @@ export default function HomePage() {
         )}
 
         {/* Content */}
-        {loading && threads.length === 0 && isAuthenticated ? (
+        {!hasHydrated ? (
+          // Still reading from localStorage — show skeleton to prevent demo flash
+          [...Array(5)].map((_, i) => <PostCardSkeleton key={i} />)
+        ) : loading && threads.length === 0 && isAuthenticated ? (
           [...Array(5)].map((_, i) => <PostCardSkeleton key={i} />)
         ) : !isAuthenticated ? (
           <>
