@@ -114,6 +114,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 export default function SettingsPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const { theme, setTheme } = useThemeStore();
 
@@ -338,6 +339,7 @@ export default function SettingsPage() {
     router.push("/login");
   }
 
+  if (!hasHydrated) return <div className="flex min-h-screen bg-background" />;
   if (!user) return null;
 
   const inputCls =

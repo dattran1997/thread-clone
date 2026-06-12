@@ -26,6 +26,7 @@ interface Message {
 
 export default function MessagesPage() {
   const user = useAuthStore((s) => s.user);
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConv, setActiveConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -62,6 +63,11 @@ export default function MessagesPage() {
     try {
       await api.post(`/messages/${activeConv.id}`, { text: optimistic.text });
     } catch {}
+  }
+
+  // Show nothing until Zustand has read from localStorage — prevents flash of "Please log in"
+  if (!hasHydrated) {
+    return <div className="flex min-h-screen bg-background" />;
   }
 
   if (!user) {

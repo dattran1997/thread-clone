@@ -14,9 +14,12 @@ interface AuthStore {
   user: AuthUser | null;
   accessToken: string | null;
   refreshToken: string | null;
+  /** true once localStorage has been read — avoids flash of unauthenticated UI on reload */
+  _hasHydrated: boolean;
   setAuth: (user: AuthUser, accessToken: string, refreshToken: string) => void;
   updateUser: (partial: Partial<AuthUser>) => void;
   clearAuth: () => void;
+  setHasHydrated: (v: boolean) => void;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -25,6 +28,7 @@ export const useAuthStore = create<AuthStore>()(
       user: null,
       accessToken: null,
       refreshToken: null,
+      _hasHydrated: false,
 
       setAuth: (user, accessToken, refreshToken) =>
         set({ user, accessToken, refreshToken }),
@@ -35,6 +39,8 @@ export const useAuthStore = create<AuthStore>()(
         })),
 
       clearAuth: () => set({ user: null, accessToken: null, refreshToken: null }),
+
+      setHasHydrated: (v) => set({ _hasHydrated: v }),
     }),
     {
       name: "threads-auth",
@@ -43,6 +49,9 @@ export const useAuthStore = create<AuthStore>()(
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     },
   ),
 );

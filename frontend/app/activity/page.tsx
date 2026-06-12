@@ -45,6 +45,7 @@ const TYPE_BADGE: Record<NotifType, string> = {
 
 export default function ActivityPage() {
   const user = useAuthStore((s) => s.user);
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
   const setUnreadCount = useNotificationStore((s) => s.setUnreadCount);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<FilterTab>("all");
@@ -75,6 +76,10 @@ export default function ActivityPage() {
     if (filter === "follows") return n.type === "FOLLOW";
     return n.type === "REPLY" || n.type === "MENTION";
   });
+
+  if (!hasHydrated) {
+    return <div className="flex min-h-screen bg-background" />;
+  }
 
   if (!user) {
     return (
