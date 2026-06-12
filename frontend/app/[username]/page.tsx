@@ -49,10 +49,16 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!profile) return;
     setLoading(true);
+    const start = Date.now();
     api.get<{ data: Thread[] }>(`/threads/user/${profile.id}?type=${tab}`)
       .then((r) => setThreads(r.data))
       .catch(() => setThreads([]))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        // Minimum 650ms skeleton so it doesn't flash
+        const elapsed = Date.now() - start;
+        const delay = Math.max(0, 650 - elapsed);
+        setTimeout(() => setLoading(false), delay);
+      });
   }, [profile, tab]);
 
   async function toggleFollow() {
@@ -172,7 +178,7 @@ export default function ProfilePage() {
           <div className="flex gap-2 mt-5">
             {isOwn ? (
               <>
-                <Link href="/settings"
+                <Link href="/settings?view=personal-info"
                   className="flex-1 py-3 text-center rounded-xl border border-border text-[15px] font-semibold text-foreground hover:bg-foreground/5 transition-colors">
                   Edit profile
                 </Link>

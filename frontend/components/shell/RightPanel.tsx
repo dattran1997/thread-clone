@@ -29,14 +29,14 @@ export function RightPanel() {
 
   useEffect(() => {
     if (!user) return;
-    api.get<{ data: SuggestedUser[] }>("/follows/suggestions")
+    api.get<{ data: SuggestedUser[] }>("/users/suggestions")
       .then((r) => setSuggested(r.data.slice(0, 3)))
       .catch(() => {});
   }, [user]);
 
   async function follow(u: SuggestedUser) {
     try {
-      await api.post(`/follows/${u.id}`, {});
+      await api.post(`/users/${u.id}/follow`, {});
       setFollowing((prev) => new Set([...prev, u.id]));
     } catch {}
   }

@@ -7,7 +7,7 @@ import {
   ShieldAlert, FileQuestion, Monitor, MoreHorizontal, X, Plus,
   Camera, Loader2,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
@@ -113,12 +113,17 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useAuthStore((s) => s.user);
   const hasHydrated = useAuthStore((s) => s._hasHydrated);
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const { theme, setTheme } = useThemeStore();
 
-  const [view, setView] = useState<ViewState>("main");
+  // Support ?view=personal-info etc. from deep-links (e.g. "Edit profile" button)
+  const [view, setView] = useState<ViewState>(() => {
+    const v = searchParams.get("view");
+    return (v as ViewState) ?? "main";
+  });
 
   // ── Personal info form state ─────────────────────────────────────────────
   const updateUser = useAuthStore((s) => s.updateUser);

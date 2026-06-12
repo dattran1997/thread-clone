@@ -160,6 +160,40 @@ function RepostMenu({ thread, reposted, onRepost, onQuote, onClose }:
   );
 }
 
+// ─── Delete confirm modal ─────────────────────────────────────────────────────
+function DeleteConfirmModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-[360px] rounded-2xl bg-secondary border border-border shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-6 pt-6 pb-5 text-center">
+          <p className="text-[17px] font-bold text-foreground">Delete thread?</p>
+          <p className="text-[14px] text-muted-foreground mt-1">This can&apos;t be undone.</p>
+        </div>
+        <div className="border-t border-border">
+          <button
+            onClick={onConfirm}
+            className="w-full py-4 text-[16px] font-semibold text-destructive hover:bg-destructive/5 transition-colors border-b border-border"
+          >
+            Delete
+          </button>
+          <button
+            onClick={onCancel}
+            className="w-full py-4 text-[16px] font-medium text-foreground hover:bg-foreground/5 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Report dialog ────────────────────────────────────────────────────────────
 const REPORT_REASONS = [
   "Spam",
@@ -269,6 +303,7 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
   const [showMenu, setShowMenu] = useState(false);
   const [showRepostMenu, setShowRepostMenu] = useState(false);
   const [showQuoteDialog, setShowQuoteDialog] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const isOwn = user?.id === thread.author.id;
   const canEdit = !!thread.editableUntil && new Date() < new Date(thread.editableUntil);
@@ -357,10 +392,14 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
   }
 
   // ── Delete ─────────────────────────────────────────────────────────────────
-  async function handleDelete(e: React.MouseEvent) {
+  function handleDeleteClick(e: React.MouseEvent) {
     e.stopPropagation();
     setShowMenu(false);
-    if (!confirm("Delete this thread?")) return;
+    setShowDeleteConfirm(true);
+  }
+
+  async function confirmDelete() {
+    setShowDeleteConfirm(false);
     try {
       await api.delete(`/threads/${thread.id}`);
       onDelete?.(thread.id);
@@ -437,7 +476,7 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
                         </Link>
                       )}
                       {isOwn && (
-                        <button onClick={handleDelete}
+                        <button onClick={handleDeleteClick}
                           className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-destructive transition-colors">
                           <Trash2 size={15} /> Delete
                         </button>
@@ -560,6 +599,9 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
         <QuoteDialog thread={thread} onClose={() => setShowQuoteDialog(false)} />
       )}
 
+      {showDeleteConfirm && (
+        <DeleteConfirmModal onConfirm={confirmDelete} onCancel={() => setShowDeleteConfirm(false)} />
+      )}
     </>
   );
 }
