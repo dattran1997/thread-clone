@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { connectSocket } from "@/lib/ws";
 import {
   Heart, MessageCircle, Repeat2, Send, BarChart2, Bookmark,
-  MoreHorizontal, Link2, EyeOff, Flag, Trash2, PenLine, X,
+  MoreHorizontal, Link2, Trash2, PenLine, X,
 } from "lucide-react";
 import { cn, fmtN, relativeTime } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -269,8 +269,6 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
   const [showMenu, setShowMenu] = useState(false);
   const [showRepostMenu, setShowRepostMenu] = useState(false);
   const [showQuoteDialog, setShowQuoteDialog] = useState(false);
-  const [showReportDialog, setShowReportDialog] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
 
   const isOwn = user?.id === thread.author.id;
   const canEdit = !!thread.editableUntil && new Date() < new Date(thread.editableUntil);
@@ -370,25 +368,6 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
     } catch { toast("Failed to delete", "error"); }
   }
 
-  // ── Mute / Unmute ──────────────────────────────────────────────────────────
-  async function toggleMute(e: React.MouseEvent) {
-    e.stopPropagation();
-    setShowMenu(false);
-    try {
-      if (isMuted) {
-        await api.delete(`/users/${thread.author.id}/mute`);
-        setIsMuted(false);
-        toast(`Unmuted @${thread.author.username}`);
-      } else {
-        await api.post(`/users/${thread.author.id}/mute`, {});
-        setIsMuted(true);
-        toast(`Muted @${thread.author.username}`);
-      }
-    } catch (err: any) {
-      toast(err?.message ?? "Action failed", "error");
-    }
-  }
-
   return (
     <>
       <div
@@ -451,20 +430,6 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
                         className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-foreground transition-colors">
                         <Link2 size={15} /> Copy link
                       </button>
-                      {!isOwn && (
-                        <button onClick={toggleMute}
-                          className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-foreground transition-colors">
-                          <EyeOff size={15} />
-                          {isMuted ? `Unmute @${thread.author.username}` : `Mute @${thread.author.username}`}
-                        </button>
-                      )}
-                      {!isOwn && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setShowMenu(false); setShowReportDialog(true); }}
-                          className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-destructive transition-colors">
-                          <Flag size={15} /> Report
-                        </button>
-                      )}
                       {isOwn && canEdit && (
                         <Link href={`/threads/${thread.id}/edit`} onClick={(e) => e.stopPropagation()}
                           className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-foreground transition-colors">
@@ -595,9 +560,6 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
         <QuoteDialog thread={thread} onClose={() => setShowQuoteDialog(false)} />
       )}
 
-      {showReportDialog && (
-        <ReportDialog thread={thread} onClose={() => setShowReportDialog(false)} />
-      )}
     </>
   );
 }
