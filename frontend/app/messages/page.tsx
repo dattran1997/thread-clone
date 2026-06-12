@@ -7,18 +7,22 @@ import { DesktopSidebar } from "@/components/shell/DesktopSidebar";
 import { MobileNav } from "@/components/shell/MobileNav";
 import { cn, relativeTime } from "@/lib/utils";
 import { ChevronLeft, Send } from "lucide-react";
+import { connectMessagesSocket, disconnectMessagesSocket } from "@/lib/ws";
 
+// Matches the shape returned by GET /messages (getConversations)
 interface Conversation {
-  id: string;
-  participant: { id: string; username: string; displayName: string; avatarUrl: string | null };
-  lastMessage: string | null;
-  lastMessageAt: string | null;
+  conversationId: string;
+  participant: { id: string; username: string; displayName: string; avatarUrl: string | null } | null;
+  lastMessage: { id: string; text: string; senderId: string; createdAt: string } | null;
   unreadCount: number;
+  updatedAt: string;
 }
 
+// Matches the shape returned by GET /messages/:id (getMessages) and new-message socket event
 interface Message {
   id: string;
   conversationId: string;
+  senderId: string;
   sender: { id: string; username: string; displayName: string; avatarUrl: string | null };
   text: string;
   createdAt: string;
@@ -26,6 +30,7 @@ interface Message {
 
 export default function MessagesPage() {
   const user = useAuthStore((s) => s.user);
+  const accessToken = useAuthStore((s) => s.accessToken);
   const hasHydrated = useAuthStore((s) => s._hasHydrated);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConv, setActiveConv] = useState<Conversation | null>(null);
@@ -33,7 +38,15 @@ export default function MessagesPage() {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // Ref so the socket handler always sees the current conversation without stale closure
+  const activeConvRef = useRef<Conversation | null>(null);
 
+  // Keep ref in sync with state
+  useEffect(() => {
+    activeConvRef.current = activeConv;
+  }, [activeConv]);
+
+  // Load conversation list
   useEffect(() => {
     if (!user) return;
     api.get<{ data: Conversation[] }>("/messages")
@@ -41,28 +54,67 @@ export default function MessagesPage() {
       .finally(() => setLoading(false));
   }, [user]);
 
+  // Connect to /messages namespace and listen for real-time messages
+  useEffect(() => {
+    if (!accessToken) return;
+
+    const socket = connectMessagesSocket(accessToken);
+
+    const handleNewMessage = (msg: Message) => {
+      // Append to chat view if this conversation is open
+      if (activeConvRef.current?.conversationId === msg.conversationId) {
+        setMessages((prev) => {
+          // Skip if we already have this message (dedup by id)
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      }
+
+      // Update last message preview in conversation list
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.conversationId === msg.conversationId
+            ? { ...c, lastMessage: { id: msg.id, text: msg.text, senderId: msg.senderId, createdAt: msg.createdAt } }
+            : c,
+        ),
+      );
+    };
+
+    socket.on("new-message", handleNewMessage);
+
+    return () => {
+      socket.off("new-message", handleNewMessage);
+      disconnectMessagesSocket();
+    };
+  }, [accessToken]);
+
   async function openConversation(conv: Conversation) {
     setActiveConv(conv);
-    const res = await api.get<{ data: Message[] }>(`/messages/${conv.id}`);
-    setMessages(res.data);
+    activeConvRef.current = conv;
+
+    // Join the socket room so we receive new-message events for this conversation
+    if (accessToken) {
+      const socket = connectMessagesSocket(accessToken);
+      socket.emit("join-conversation", { conversationId: conv.conversationId });
+    }
+
+    // Fetch message history (API returns newest-first → reverse for chat order)
+    const res = await api.get<{ data: Message[] }>(`/messages/${conv.conversationId}`);
+    setMessages(res.data.slice().reverse());
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   }
 
-  async function sendMessage() {
-    if (!text.trim() || !activeConv) return;
-    const optimistic: Message = {
-      id: crypto.randomUUID(),
-      conversationId: activeConv.id,
-      sender: { id: user!.id, username: user!.username, displayName: user!.displayName, avatarUrl: user!.avatarUrl },
+  function sendMessage() {
+    if (!text.trim() || !activeConv || !accessToken) return;
+    const socket = connectMessagesSocket(accessToken);
+    // Send via WebSocket — the gateway saves to DB and broadcasts new-message to the room
+    // (including back to the sender, so no optimistic add needed)
+    socket.emit("send-message", {
+      conversationId: activeConv.conversationId,
       text: text.trim(),
-      createdAt: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, optimistic]);
+    });
     setText("");
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
-    try {
-      await api.post(`/messages/${activeConv.id}`, { text: optimistic.text });
-    } catch {}
   }
 
   // Show nothing until Zustand has read from localStorage — prevents flash of "Please log in"
@@ -100,24 +152,28 @@ export default function MessagesPage() {
             <div className="p-6 text-center text-sm text-muted-foreground">No conversations yet</div>
           ) : (
             conversations.map((conv) => (
-              <button key={conv.id} onClick={() => openConversation(conv)}
+              <button key={conv.conversationId} onClick={() => openConversation(conv)}
                 className={cn(
                   "flex items-center gap-3 px-4 py-4 border-b border-border hover:bg-foreground/5 transition-colors text-left w-full",
                   conv.unreadCount > 0 && "bg-foreground/5",
-                  activeConv?.id === conv.id && "bg-secondary",
+                  activeConv?.conversationId === conv.conversationId && "bg-secondary",
                 )}>
-                <Avatar src={conv.participant.avatarUrl} alt={conv.participant.displayName} size={44} />
+                <Avatar
+                  src={conv.participant?.avatarUrl ?? null}
+                  alt={conv.participant?.displayName ?? "Unknown"}
+                  size={44}
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline">
                     <p className={cn("text-sm font-medium text-foreground", conv.unreadCount > 0 && "font-bold")}>
-                      {conv.participant.displayName}
+                      {conv.participant?.displayName ?? "Unknown"}
                     </p>
-                    {conv.lastMessageAt && (
-                      <span className="text-xs text-muted-foreground">{relativeTime(conv.lastMessageAt)}</span>
+                    {conv.lastMessage && (
+                      <span className="text-xs text-muted-foreground">{relativeTime(conv.lastMessage.createdAt)}</span>
                     )}
                   </div>
                   <p className={cn("text-xs truncate text-muted-foreground", conv.unreadCount > 0 && "text-foreground font-medium")}>
-                    {conv.lastMessage ?? "No messages yet"}
+                    {conv.lastMessage?.text ?? "No messages yet"}
                   </p>
                 </div>
                 {conv.unreadCount > 0 && (
@@ -138,8 +194,12 @@ export default function MessagesPage() {
               <button onClick={() => setActiveConv(null)} className="lg:hidden text-foreground hover:text-muted-foreground">
                 <ChevronLeft size={24} />
               </button>
-              <Avatar src={activeConv.participant.avatarUrl} alt={activeConv.participant.displayName} size={32} />
-              <span className="font-semibold text-foreground">{activeConv.participant.displayName}</span>
+              <Avatar
+                src={activeConv.participant?.avatarUrl ?? null}
+                alt={activeConv.participant?.displayName ?? "Unknown"}
+                size={32}
+              />
+              <span className="font-semibold text-foreground">{activeConv.participant?.displayName ?? "Unknown"}</span>
             </div>
 
             {/* Messages */}

@@ -161,9 +161,11 @@ export class AuthService {
     const frontendUrl = this.config.get<string>("FRONTEND_URL") ?? "http://localhost:3000";
     const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
 
-    if (this.config.get<string>("NODE_ENV") !== "production") {
+    // If SMTP is not configured, log the reset URL to the console regardless of environment
+    const smtpUser = this.config.get<string>("SMTP_USER");
+    if (!smtpUser) {
       console.log("\n╔══════════════════════════════════════════════════════════╗");
-      console.log("║  [DEV] PASSWORD RESET                                   ║");
+      console.log("║  PASSWORD RESET (no SMTP configured — console only)     ║");
       console.log("╠══════════════════════════════════════════════════════════╣");
       console.log(`║  To: ${email.padEnd(52)}║`);
       console.log("║  Open this URL to reset your password:                  ║");
@@ -174,9 +176,6 @@ export class AuthService {
       console.log("╚══════════════════════════════════════════════════════════╝\n");
       return;
     }
-
-    const smtpUser = this.config.get<string>("SMTP_USER");
-    if (!smtpUser) return;
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -294,15 +293,16 @@ export class AuthService {
     await this.prisma.session.deleteMany({ where: { userId } });
   }
 
-  // ── Email sender (logs to console in dev, real email in prod) ─────────────
+  // ── Email sender (real email when SMTP is configured, console log otherwise) ──
   private async sendVerificationEmail(email: string, token: string) {
     const frontendUrl = this.config.get<string>("FRONTEND_URL") ?? "http://localhost:3000";
     const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
 
-    // Dev mode: log to console (no SMTP needed)
-    if (this.config.get<string>("NODE_ENV") !== "production") {
+    // If SMTP is not configured, log the verification URL to the console
+    const smtpUser = this.config.get<string>("SMTP_USER");
+    if (!smtpUser) {
       console.log("\n╔══════════════════════════════════════════════════════════╗");
-      console.log("║  [DEV] EMAIL VERIFICATION                               ║");
+      console.log("║  EMAIL VERIFICATION (no SMTP configured — console only) ║");
       console.log("╠══════════════════════════════════════════════════════════╣");
       console.log(`║  To: ${email.padEnd(52)}║`);
       console.log("║  Open this URL in your browser to verify:               ║");
@@ -311,13 +311,6 @@ export class AuthService {
         console.log(`║  ${verifyUrl.slice(56, 112).padEnd(56)}║`);
       }
       console.log("╚══════════════════════════════════════════════════════════╝\n");
-      return;
-    }
-
-    // Production: use nodemailer if SMTP_USER is set
-    const smtpUser = this.config.get<string>("SMTP_USER");
-    if (!smtpUser) {
-      console.warn("[AUTH] SMTP not configured — skipping email for:", email);
       return;
     }
 
