@@ -25,15 +25,42 @@ export default function ThreadDetailPage() {
   const [data, setData] = useState<ThreadDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Live stats bar counts — kept separate so they can update without re-fetching
+  const [likeCount, setLikeCount] = useState(0);
+  const [repostCount, setRepostCount] = useState(0);
+  const [replyCount, setReplyCount] = useState(0);
+
   useEffect(() => {
     api.get<ThreadDetail>(`/threads/${id}/replies`)
-      .then(setData)
+      .then((d) => {
+        setData(d);
+        setLikeCount(d.thread.likeCount);
+        setRepostCount(d.thread.repostCount);
+        setReplyCount(d.thread.replyCount);
+      })
       .catch(() => router.push("/"))
       .finally(() => setLoading(false));
   }, [id, router]);
 
+  // Keep stats bar in sync with live socket updates from PostCard's emitThreadUpdate
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        threadId: string; likeCount?: number; repostCount?: number; replyCount?: number;
+      };
+      if (detail.threadId !== id) return;
+      if (detail.likeCount   !== undefined) setLikeCount(detail.likeCount);
+      if (detail.repostCount !== undefined) setRepostCount(detail.repostCount);
+      if (detail.replyCount  !== undefined) setReplyCount(detail.replyCount);
+    };
+    window.addEventListener("thread-updated", handler);
+    return () => window.removeEventListener("thread-updated", handler);
+  }, [id]);
+
   function handleReply(reply: Thread) {
     setData((prev) => prev ? { ...prev, replies: [...prev.replies, reply] } : null);
+    // Increment locally — the socket broadcast will confirm the true count shortly after
+    setReplyCount((c) => c + 1);
   }
 
   return (
@@ -63,11 +90,11 @@ export default function ThreadDetailPage() {
               onDelete={() => router.replace("/")}
             />
 
-            {/* Stats bar */}
+            {/* Stats bar — uses live local state, not the frozen snapshot */}
             <div className="flex gap-6 px-4 py-3 border-b border-border text-sm text-muted-foreground">
-              <span><strong className="text-foreground">{data.thread.repostCount}</strong> reposts</span>
-              <span><strong className="text-foreground">{data.thread.likeCount}</strong> likes</span>
-              <span><strong className="text-foreground">{data.thread.replyCount}</strong> replies</span>
+              <span><strong className="text-foreground">{repostCount}</strong> reposts</span>
+              <span><strong className="text-foreground">{likeCount}</strong> likes</span>
+              <span><strong className="text-foreground">{replyCount}</strong> replies</span>
             </div>
 
             {/* Reply composer */}
