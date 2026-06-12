@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from "@nestjs/common";
+import * as path from "path";
+import * as fs from "fs";
 import { PrismaService } from "../../prisma/prisma.service";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
 
@@ -73,6 +75,27 @@ export class UsersService {
         id: true, username: true, displayName: true, bio: true,
         avatarUrl: true, links: true, topics: true, notes: true,
         isVerified: true, isPrivate: true, role: true,
+      },
+    });
+  }
+
+  async saveAvatarFile(userId: string, file: Express.Multer.File) {
+    // Write file to uploads/avatars/
+    const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+    const filename = `avatar-${userId}-${Date.now()}${ext}`;
+    const uploadDir = path.join(process.cwd(), "uploads", "avatars");
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+    fs.writeFileSync(path.join(uploadDir, filename), file.buffer);
+
+    const backendUrl = process.env.BACKEND_URL ?? "http://localhost:3001";
+    const avatarUrl = `${backendUrl}/uploads/avatars/${filename}`;
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl },
+      select: {
+        id: true, username: true, displayName: true,
+        avatarUrl: true, role: true, emailVerified: true,
       },
     });
   }

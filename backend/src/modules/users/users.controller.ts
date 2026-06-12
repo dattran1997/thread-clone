@@ -2,9 +2,11 @@ import {
   Controller, Get, Patch, Post, Delete,
   Param, Body, Query, UseGuards,
   UploadedFile, UseInterceptors, HttpCode, HttpStatus,
+  BadRequestException,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from "@nestjs/swagger";
+import { memoryStorage } from "multer";
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiQuery } from "@nestjs/swagger";
 import { UsersService } from "./users.service";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
@@ -34,15 +36,26 @@ export class UsersController {
 
   @Post("me/avatar")
   @ApiBearerAuth()
-  @UseInterceptors(FileInterceptor("file"))
-  @ApiOperation({ summary: "Upload avatar" })
+  @ApiOperation({ summary: "Upload avatar image" })
+  @ApiConsumes("multipart/form-data")
+  @UseInterceptors(
+    FileInterceptor("file", {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+      fileFilter: (_req, file, cb) => {
+        if (!file.mimetype.startsWith("image/")) {
+          return cb(new BadRequestException("Only image files are allowed"), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
   async uploadAvatar(
     @CurrentUser() user: { id: string },
     @UploadedFile() file: Express.Multer.File,
   ) {
-    // TODO: upload to MinIO in M11; for now return a placeholder
-    const avatarUrl = `/media/${user.id}/avatar.webp`;
-    return this.usersService.updateAvatar(user.id, avatarUrl);
+    if (!file) throw new BadRequestException("No file uploaded");
+    return this.usersService.saveAvatarFile(user.id, file);
   }
 
   @Delete("me")

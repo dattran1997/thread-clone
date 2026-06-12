@@ -1,10 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ChevronRight, Shield, User, Bell, EyeOff, HelpCircle, LogOut,
   Languages, Check, Palette, Lock, ShieldCheck, Smartphone,
   Key, AtSign, MicOff, Ban, FileText, Info, AlertTriangle,
   ShieldAlert, FileQuestion, Monitor, MoreHorizontal, X, Plus,
+  Camera, Loader2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
@@ -35,12 +36,12 @@ function SubPageHeader({
   title, onBack, action,
 }: { title: string; onBack: () => void; action?: React.ReactNode }) {
   return (
-    <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-md px-4 py-4">
+    <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/90 backdrop-blur-xl px-4 py-4">
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="text-[var(--text)] hover:text-[var(--text2)] transition-colors">
+        <button onClick={onBack} className="text-foreground hover:text-muted-foreground transition-colors">
           <ChevronRight size={22} className="rotate-180" />
         </button>
-        <h1 className="text-[18px] font-semibold text-[var(--text)]">{title}</h1>
+        <h1 className="text-[18px] font-semibold text-foreground">{title}</h1>
       </div>
       {action}
     </div>
@@ -59,22 +60,22 @@ function SettingItem({
       disabled={disabled}
       className={cn(
         "flex w-full items-center justify-between px-6 py-4 transition-colors",
-        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-[var(--text)]/5 active:bg-[var(--text)]/10",
+        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-foreground/5 active:bg-foreground/10",
       )}
     >
       <div className="flex items-center gap-4">
         {icon && (
-          <span className={danger ? "text-red-500" : "text-[var(--text)]"}>
+          <span className={danger ? "text-destructive" : "text-foreground"}>
             {icon}
           </span>
         )}
-        <span className={cn("text-[16px]", danger ? "text-red-500" : "text-[var(--text)]")}>
+        <span className={cn("text-[16px]", danger ? "text-destructive" : "text-foreground")}>
           {label}
         </span>
       </div>
       <div className="flex items-center gap-2">
-        {value && <span className="text-[14px] text-[var(--text2)]">{value}</span>}
-        {!hideChevron && <ChevronRight size={18} className="text-[var(--text2)]" />}
+        {value && <span className="text-[14px] text-muted-foreground">{value}</span>}
+        {!hideChevron && <ChevronRight size={18} className="text-muted-foreground" />}
       </div>
     </button>
   );
@@ -88,12 +89,12 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
       className={cn(
         "relative w-11 h-6 rounded-full transition-colors shrink-0",
         disabled ? "opacity-50 cursor-not-allowed" : "",
-        checked ? "bg-[var(--accent)]" : "bg-[var(--bg3)]",
+        checked ? "bg-primary" : "bg-muted",
       )}
     >
       <div
         className={cn(
-          "absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform",
+          "absolute top-0.5 w-5 h-5 rounded-full bg-background shadow-sm transition-transform",
           checked ? "left-[calc(100%-22px)]" : "left-0.5",
         )}
       />
@@ -103,7 +104,7 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-6 py-3 text-[12px] uppercase tracking-wider text-[var(--text2)]">
+    <p className="px-6 py-3 text-[13px] uppercase tracking-wider text-muted-foreground">
       {children}
     </p>
   );
@@ -118,7 +119,21 @@ export default function SettingsPage() {
 
   const [view, setView] = useState<ViewState>("main");
 
-  // Settings from API
+  // ── Personal info form state ─────────────────────────────────────────────
+  const updateUser = useAuthStore((s) => s.updateUser);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    displayName: user?.displayName ?? "",
+    bio: "",
+    link: "",
+    notes: "",
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
+
+  // ── Settings from API ────────────────────────────────────────────────────
   const [isPrivate, setIsPrivate] = useState(false);
   const [hiddenWords, setHiddenWords] = useState<string[]>([]);
   const [newWord, setNewWord] = useState("");
@@ -133,12 +148,28 @@ export default function SettingsPage() {
   const [saveLogin, setSaveLogin] = useState(true);
   const [pauseNotifs, setPauseNotifs] = useState(false);
   const [language, setLanguage] = useState<"English" | "Tiếng Việt">("English");
+  const [activeSessionMenu, setActiveSessionMenu] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
     api.get<{ isPrivate: boolean }>("/settings").then((s) => setIsPrivate(s.isPrivate)).catch(() => {});
     api.get<{ words: string[] }>("/settings/hidden-words").then((r) => setHiddenWords(r.words)).catch(() => {});
   }, [user]);
+
+  // Load full profile when entering personal-info view
+  useEffect(() => {
+    if (view !== "personal-info" || !user) return;
+    api.get<{
+      displayName: string; bio: string | null; links: string[]; notes: string | null;
+    }>(`/users/${user.username}`).then((p) => {
+      setProfileForm({
+        displayName: p.displayName ?? "",
+        bio: p.bio ?? "",
+        link: p.links?.[0] ?? "",
+        notes: p.notes ?? "",
+      });
+    }).catch(() => {});
+  }, [view, user]);
 
   async function savePrivacy() {
     try {
@@ -182,6 +213,68 @@ export default function SettingsPage() {
     } catch { toast("Failed to remove word", "error"); }
   }
 
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast("Only image files allowed", "error"); return; }
+    if (file.size > 5 * 1024 * 1024) { toast("Image must be under 5 MB", "error"); return; }
+
+    // Show preview immediately
+    const preview = URL.createObjectURL(file);
+    setAvatarPreview(preview);
+    setAvatarUploading(true);
+
+    try {
+      const stored = localStorage.getItem("threads-auth");
+      const token = stored ? JSON.parse(stored)?.state?.accessToken : null;
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`${BASE}/users/me/avatar`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data: { avatarUrl: string } = await res.json();
+      // Update auth store so avatar appears everywhere
+      updateUser({ avatarUrl: data.avatarUrl });
+      // Keep the live preview (already showing)
+      toast("Profile photo updated");
+    } catch {
+      setAvatarPreview(null);
+      toast("Failed to upload photo", "error");
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
+  async function saveProfile() {
+    if (profileSaving) return;
+    setProfileSaving(true);
+    try {
+      const body: Record<string, unknown> = {};
+      if (profileForm.displayName.trim()) body.displayName = profileForm.displayName.trim();
+      if (profileForm.bio !== undefined) body.bio = profileForm.bio;
+      if (profileForm.notes !== undefined) body.notes = profileForm.notes;
+      // Wrap single link into array, validated as URL on backend
+      const linkTrimmed = profileForm.link.trim();
+      body.links = linkTrimmed
+        ? [linkTrimmed.startsWith("http") ? linkTrimmed : `https://${linkTrimmed}`]
+        : [];
+
+      await api.patch("/users/me", body);
+      // Reflect displayName change in nav/header immediately
+      if (body.displayName) updateUser({ displayName: body.displayName as string });
+      toast("Profile saved");
+      setView("main");
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Failed to save", "error");
+    } finally {
+      setProfileSaving(false);
+    }
+  }
+
   async function logout() {
     try { await api.delete("/auth/logout"); } catch {}
     clearAuth();
@@ -191,43 +284,140 @@ export default function SettingsPage() {
   if (!user) return null;
 
   const inputCls =
-    "w-full px-4 py-3 rounded-xl bg-[var(--bg2)] border border-[var(--border)] text-[15px] text-[var(--text)] placeholder:text-[var(--text2)] outline-none focus:ring-1 focus:ring-[var(--accent)]";
+    "w-full bg-secondary border border-border rounded-xl py-4 px-4 text-[15px] text-foreground placeholder:text-muted-foreground focus:border-primary outline-none transition-colors";
 
   const btnPrimary = (disabled = false) =>
     cn(
-      "w-full py-3 rounded-xl text-[15px] font-semibold transition-opacity",
+      "w-full py-4 rounded-xl text-[15px] font-bold transition-opacity",
       disabled
-        ? "bg-[var(--accent)]/40 text-[var(--accent-text)]/60 cursor-not-allowed"
-        : "bg-[var(--accent)] text-[var(--accent-text)] hover:opacity-90",
+        ? "bg-primary/40 text-primary-foreground/60 cursor-not-allowed"
+        : "bg-primary text-primary-foreground hover:opacity-90",
     );
 
   // ── Sub-view renderers ──────────────────────────────────────────────────────
 
   if (view === "personal-info") return (
     <PageShell>
-      <SubPageHeader title="Personal information" onBack={() => setView("main")}
+      {/* Hidden file input for avatar */}
+      <input
+        ref={avatarInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleAvatarChange}
+      />
+
+      <SubPageHeader
+        title="Personal information"
+        onBack={() => { setView("main"); setAvatarPreview(null); }}
         action={
-          <button onClick={() => setView("main")}
-            className="text-[15px] font-medium text-[var(--accent)] hover:opacity-80">
-            Done
+          <button
+            onClick={saveProfile}
+            disabled={profileSaving}
+            className="text-[15px] font-medium text-primary hover:opacity-80 disabled:opacity-40"
+          >
+            {profileSaving ? "Saving…" : "Save"}
           </button>
         }
       />
+
       <div className="flex flex-col py-6 px-6 gap-6">
+        {/* Avatar picker */}
         <div className="flex flex-col items-center gap-3">
-          <Avatar src={user.avatarUrl} alt={user.displayName} size={96} />
-          <button className="text-[15px] font-medium text-[var(--accent)] hover:opacity-80">
-            Change profile photo
+          <div className="relative">
+            <Avatar
+              src={avatarPreview ?? user.avatarUrl}
+              alt={user.displayName}
+              size={96}
+            />
+            {/* Camera overlay */}
+            <button
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={avatarUploading}
+              className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 hover:opacity-100 transition-opacity disabled:cursor-wait"
+              title="Change photo"
+            >
+              {avatarUploading
+                ? <Loader2 size={24} className="text-white animate-spin" />
+                : <Camera size={24} className="text-white" />
+              }
+            </button>
+          </div>
+          <button
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={avatarUploading}
+            className="text-[15px] font-medium text-primary hover:opacity-80 disabled:opacity-40 transition-opacity"
+          >
+            {avatarUploading ? "Uploading…" : "Change profile photo"}
           </button>
         </div>
+
+        {/* Form fields */}
         <div className="flex flex-col gap-4">
-          <Field label="Name"><input defaultValue={user.displayName} className={inputCls} /></Field>
-          <Field label="Username"><input defaultValue={user.username} className={inputCls} /></Field>
-          <Field label="Bio"><textarea rows={3} className={cn(inputCls, "resize-none")} placeholder="Write a bio…" /></Field>
-          <Field label="Link"><input placeholder="https://…" className={inputCls} /></Field>
+          <Field label="Name">
+            <input
+              value={profileForm.displayName}
+              onChange={(e) => setProfileForm((f) => ({ ...f, displayName: e.target.value }))}
+              maxLength={50}
+              placeholder="Your name"
+              className={inputCls}
+            />
+          </Field>
+
+          <Field label="Username">
+            <input
+              value={user.username}
+              readOnly
+              className={cn(inputCls, "opacity-50 cursor-not-allowed")}
+            />
+            <p className="text-[12px] text-muted-foreground ml-1">
+              Username changes coming soon
+            </p>
+          </Field>
+
+          <Field label="Bio">
+            <textarea
+              value={profileForm.bio}
+              onChange={(e) => setProfileForm((f) => ({ ...f, bio: e.target.value }))}
+              rows={3}
+              maxLength={160}
+              placeholder="Write a bio…"
+              className={cn(inputCls, "resize-none")}
+            />
+            <p className="text-right text-[12px] text-muted-foreground">
+              {160 - profileForm.bio.length}
+            </p>
+          </Field>
+
+          <Field label="Link">
+            <input
+              value={profileForm.link}
+              onChange={(e) => setProfileForm((f) => ({ ...f, link: e.target.value }))}
+              placeholder="yoursite.com"
+              className={inputCls}
+            />
+          </Field>
+
+          <Field label="Notes">
+            <input
+              value={profileForm.notes}
+              onChange={(e) => setProfileForm((f) => ({ ...f, notes: e.target.value }))}
+              maxLength={60}
+              placeholder="Short note shown on your profile…"
+              className={inputCls}
+            />
+            <p className="text-right text-[12px] text-muted-foreground">
+              {60 - profileForm.notes.length}
+            </p>
+          </Field>
         </div>
-        <button onClick={() => toast("Profile update coming soon")} className={btnPrimary()}>
-          Save changes
+
+        <button
+          onClick={saveProfile}
+          disabled={profileSaving}
+          className={btnPrimary(profileSaving)}
+        >
+          {profileSaving ? "Saving…" : "Save changes"}
         </button>
       </div>
     </PageShell>
@@ -240,9 +430,9 @@ export default function SettingsPage() {
         <SectionLabel>Theme</SectionLabel>
         {(["dark", "light", "warm"] as const).map((t) => (
           <button key={t} onClick={() => setTheme(t)}
-            className="flex w-full items-center justify-between px-6 py-4 hover:bg-[var(--text)]/5 transition-colors">
-            <span className="text-[16px] text-[var(--text)] capitalize">{t}</span>
-            {theme === t && <Check size={18} className="text-[var(--accent)]" />}
+            className="flex w-full items-center justify-between px-6 py-4 hover:bg-foreground/5 transition-colors">
+            <span className="text-[16px] text-foreground capitalize">{t}</span>
+            {theme === t && <Check size={18} className="text-primary" />}
           </button>
         ))}
       </div>
@@ -255,9 +445,9 @@ export default function SettingsPage() {
       <div className="flex flex-col py-2">
         {(["English", "Tiếng Việt"] as const).map((lang) => (
           <button key={lang} onClick={() => { setLanguage(lang); setView("main"); }}
-            className="flex w-full items-center justify-between px-6 py-4 hover:bg-[var(--text)]/5 transition-colors">
-            <span className="text-[16px] text-[var(--text)]">{lang}</span>
-            {language === lang && <Check size={18} className="text-[var(--accent)]" />}
+            className="flex w-full items-center justify-between px-6 py-4 hover:bg-foreground/5 transition-colors">
+            <span className="text-[16px] text-foreground">{lang}</span>
+            {language === lang && <Check size={18} className="text-primary" />}
           </button>
         ))}
       </div>
@@ -280,7 +470,7 @@ export default function SettingsPage() {
     <PageShell>
       <SubPageHeader title="Password" onBack={() => setView("security")} />
       <form onSubmit={changePassword} className="flex flex-col px-6 py-6 gap-4">
-        <p className="text-[14px] text-[var(--text2)]">
+        <p className="text-[14px] text-muted-foreground">
           Password must be at least 8 characters. Use a combination of letters, numbers and symbols.
         </p>
         <input type="password" placeholder="Current password" required value={pw.current}
@@ -293,7 +483,7 @@ export default function SettingsPage() {
           {pwLoading ? "Saving…" : "Change password"}
         </button>
         <button type="button" onClick={() => setView("security-forgot-password")}
-          className="text-[var(--accent)] text-[14px] hover:underline text-left">
+          className="text-primary text-[14px] hover:underline text-left">
           Forgotten your password?
         </button>
       </form>
@@ -304,12 +494,12 @@ export default function SettingsPage() {
     <PageShell>
       <SubPageHeader title="Forgot password" onBack={() => setView("security-password")} />
       <div className="flex flex-col items-center text-center gap-4 py-8 px-6">
-        <div className="w-20 h-20 rounded-full border-2 border-[var(--accent)] flex items-center justify-center mb-2">
-          <Lock size={36} className="text-[var(--accent)]" />
+        <div className="w-20 h-20 rounded-full border-2 border-primary flex items-center justify-center mb-2">
+          <Lock size={36} className="text-primary" />
         </div>
-        <h2 className="text-[20px] font-medium text-[var(--text)]">Trouble logging in?</h2>
-        <p className="text-[14px] text-[var(--text2)]">
-          Enter your email and we'll send a link to get back into your account.
+        <h2 className="text-[20px] font-medium text-foreground">Trouble logging in?</h2>
+        <p className="text-[14px] text-muted-foreground">
+          Enter your email and we&apos;ll send a link to get back into your account.
         </p>
         <input type="email" placeholder="Email address" className={cn(inputCls, "w-full mt-2")} />
         <button onClick={() => toast("Reset link sent")} className={btnPrimary()}>
@@ -323,21 +513,21 @@ export default function SettingsPage() {
     <PageShell>
       <SubPageHeader title="Two-factor authentication" onBack={() => setView("security")} />
       <div className="flex flex-col py-4">
-        <p className="px-6 pb-6 text-[14px] text-[var(--text2)] border-b border-[var(--border)]">
+        <p className="px-6 pb-6 text-[14px] text-muted-foreground border-b border-border">
           Two-factor authentication protects your account by requiring an additional code when you log in on an unrecognized device.
         </p>
-        <h2 className="px-6 py-4 text-[16px] font-medium text-[var(--text)]">Choose your security method</h2>
-        <div className="flex w-full items-start justify-between px-6 py-4 border-b border-[var(--border)]">
+        <h2 className="px-6 py-4 text-[16px] font-medium text-foreground">Choose your security method</h2>
+        <div className="flex w-full items-start justify-between px-6 py-4 border-b border-border">
           <div className="flex flex-col gap-1 pr-6">
-            <span className="text-[16px] text-[var(--text)]">Authentication app (recommended)</span>
-            <span className="text-[13px] text-[var(--text2)] mt-1">Uses Google Authenticator or Duo Mobile.</span>
+            <span className="text-[16px] text-foreground">Authentication app (recommended)</span>
+            <span className="text-[13px] text-muted-foreground mt-1">Uses Google Authenticator or Duo Mobile.</span>
           </div>
           <Toggle checked={twoFactorApp} onChange={() => setTwoFactorApp(!twoFactorApp)} />
         </div>
-        <div className="flex w-full items-start justify-between px-6 py-4 border-b border-[var(--border)] opacity-50">
+        <div className="flex w-full items-start justify-between px-6 py-4 border-b border-border opacity-50">
           <div className="flex flex-col gap-1 pr-6">
-            <span className="text-[16px] text-[var(--text)]">Text message (SMS)</span>
-            <span className="text-[13px] text-[var(--text2)] mt-1">Currently unavailable.</span>
+            <span className="text-[16px] text-foreground">Text message (SMS)</span>
+            <span className="text-[13px] text-muted-foreground mt-1">Currently unavailable.</span>
           </div>
           <Toggle checked={false} onChange={() => {}} disabled />
         </div>
@@ -347,24 +537,57 @@ export default function SettingsPage() {
 
   if (view === "security-login-activity") return (
     <PageShell>
-      <SubPageHeader title="Login activity" onBack={() => setView("security")} />
+      <SubPageHeader title="Login activity" onBack={() => { setView("security"); setActiveSessionMenu(null); }} />
       <div className="flex flex-col py-2">
-        <h2 className="px-6 py-4 text-[16px] font-medium text-[var(--text)]">Where you're logged in</h2>
+        <h2 className="px-6 py-4 text-[16px] font-medium text-foreground">Where you&apos;re logged in</h2>
         {[
           { icon: <Smartphone size={22} />, name: "iPhone 14 Pro", location: "San Francisco, CA", time: "Active now", active: true },
           { icon: <Monitor size={22} />, name: "Mac OS", location: "San Jose, CA", time: "Yesterday", active: false },
         ].map((d) => (
-          <div key={d.name} className="flex items-center gap-4 px-6 py-4 border-b border-[var(--border)]">
-            <span className={d.active ? "text-[var(--text)]" : "text-[var(--text2)]"}>{d.icon}</span>
+          <div key={d.name} className="relative flex items-center gap-4 px-6 py-4 border-b border-border">
+            <span className={d.active ? "text-foreground" : "text-muted-foreground"}>{d.icon}</span>
             <div className="flex flex-col flex-1">
-              <span className="text-[15px] text-[var(--text)]">{d.location} · {d.name}</span>
-              <span className={cn("text-[13px] mt-0.5", d.active ? "text-[var(--accent)]" : "text-[var(--text2)]")}>
+              <span className="text-[15px] text-foreground">{d.location} · {d.name}</span>
+              <span className={cn("text-[13px] mt-0.5", d.active ? "text-primary" : "text-muted-foreground")}>
                 {d.time}
               </span>
             </div>
-            <button className="text-[var(--text2)] hover:text-[var(--text)]">
+            <button
+              onClick={() => setActiveSessionMenu(activeSessionMenu === d.name ? null : d.name)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
               <MoreHorizontal size={20} />
             </button>
+
+            {/* Dropdown menu */}
+            {activeSessionMenu === d.name && (
+              <>
+                {/* Transparent overlay to catch outside clicks */}
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setActiveSessionMenu(null)}
+                />
+                {/* Menu */}
+                <div className="absolute right-6 top-12 z-20 min-w-[200px] rounded-2xl border border-border bg-background shadow-xl overflow-hidden">
+                  {!d.active && (
+                    <button
+                      onClick={() => { toast("Flagged as unrecognized — we'll investigate"); setActiveSessionMenu(null); }}
+                      className="flex w-full items-center gap-3 px-4 py-3.5 text-[14px] text-amber-500 hover:bg-foreground/5 transition-colors text-left"
+                    >
+                      <AlertTriangle size={16} />
+                      This wasn&apos;t me
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { toast(d.active ? "Logging out of this device…" : `Logged out of ${d.name}`); setActiveSessionMenu(null); }}
+                    className="flex w-full items-center gap-3 px-4 py-3.5 text-[14px] text-destructive hover:bg-destructive/5 transition-colors text-left border-t border-border first:border-t-0"
+                  >
+                    <LogOut size={16} />
+                    {d.active ? "Log out on this device" : "Log out of this device"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -375,12 +598,12 @@ export default function SettingsPage() {
     <PageShell>
       <SubPageHeader title="Saved login info" onBack={() => setView("security")} />
       <div className="flex flex-col py-2">
-        <div className="flex w-full items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <span className="text-[16px] text-[var(--text)]">Saved login info</span>
+        <div className="flex w-full items-center justify-between px-6 py-4 border-b border-border">
+          <span className="text-[16px] text-foreground">Saved login info</span>
           <Toggle checked={saveLogin} onChange={() => setSaveLogin(!saveLogin)} />
         </div>
-        <p className="px-6 py-4 text-[13px] text-[var(--text2)]">
-          We'll remember your account info on this device so you don't need to enter it again.
+        <p className="px-6 py-4 text-[13px] text-muted-foreground">
+          We&apos;ll remember your account info on this device so you don&apos;t need to enter it again.
         </p>
       </div>
     </PageShell>
@@ -390,8 +613,8 @@ export default function SettingsPage() {
     <PageShell>
       <SubPageHeader title="Notifications" onBack={() => setView("main")} />
       <div className="flex flex-col py-2">
-        <div className="flex w-full items-center justify-between px-6 py-4 border-b border-[var(--border)] mb-2">
-          <span className="text-[16px] text-[var(--text)]">Pause all</span>
+        <div className="flex w-full items-center justify-between px-6 py-4 border-b border-border mb-2">
+          <span className="text-[16px] text-foreground">Pause all</span>
           <Toggle checked={pauseNotifs} onChange={() => setPauseNotifs(!pauseNotifs)} />
         </div>
         <SettingItem label="Threads and replies" onClick={() => setView("notifications-threads")} />
@@ -450,16 +673,16 @@ export default function SettingsPage() {
     <PageShell>
       <SubPageHeader title="Privacy" onBack={() => setView("main")}
         action={
-          <button onClick={savePrivacy} className="text-[15px] font-medium text-[var(--accent)] hover:opacity-80">
+          <button onClick={savePrivacy} className="text-[15px] font-medium text-primary hover:opacity-80">
             Save
           </button>
         }
       />
       <div className="flex flex-col py-2">
-        <div className="flex w-full items-center justify-between px-6 py-4 border-b border-[var(--border)] mb-2">
+        <div className="flex w-full items-center justify-between px-6 py-4 border-b border-border mb-2">
           <div className="flex flex-col gap-0.5">
-            <span className="text-[16px] text-[var(--text)]">Private profile</span>
-            <span className="text-[13px] text-[var(--text2)]">Only approved followers see your threads</span>
+            <span className="text-[16px] text-foreground">Private profile</span>
+            <span className="text-[13px] text-muted-foreground">Only approved followers see your threads</span>
           </div>
           <Toggle checked={isPrivate} onChange={() => setIsPrivate(!isPrivate)} />
         </div>
@@ -475,14 +698,14 @@ export default function SettingsPage() {
     <PageShell>
       <SubPageHeader title="Mentions" onBack={() => setView("privacy")} />
       <div className="flex flex-col py-4">
-        <p className="px-6 pb-6 text-[14px] text-[var(--text2)] border-b border-[var(--border)]">
+        <p className="px-6 pb-6 text-[14px] text-muted-foreground border-b border-border">
           Choose who can @mention you to link your profile.
         </p>
         {["Everyone", "Profiles you follow", "No one"].map((opt, i) => (
           <button key={opt}
-            className="flex w-full items-center justify-between px-6 py-4 hover:bg-[var(--text)]/5 transition-colors">
-            <span className="text-[16px] text-[var(--text)]">{opt}</span>
-            {i === 0 && <Check size={18} className="text-[var(--accent)]" />}
+            className="flex w-full items-center justify-between px-6 py-4 hover:bg-foreground/5 transition-colors">
+            <span className="text-[16px] text-foreground">{opt}</span>
+            {i === 0 && <Check size={18} className="text-primary" />}
           </button>
         ))}
       </div>
@@ -493,10 +716,10 @@ export default function SettingsPage() {
     <PageShell>
       <SubPageHeader title="Muted accounts" onBack={() => setView("privacy")} />
       <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-        <MicOff size={48} className="text-[var(--text2)] mb-4" />
-        <h2 className="text-[18px] mb-2 text-[var(--text)]">Muted accounts</h2>
-        <p className="text-[14px] text-[var(--text2)]">
-          Accounts you mute won't know you muted them. You won't see their threads or replies.
+        <MicOff size={48} className="text-muted-foreground mb-4" />
+        <h2 className="text-[18px] mb-2 text-foreground">Muted accounts</h2>
+        <p className="text-[14px] text-muted-foreground">
+          Accounts you mute won&apos;t know you muted them. You won&apos;t see their threads or replies.
         </p>
       </div>
     </PageShell>
@@ -507,17 +730,17 @@ export default function SettingsPage() {
       <SubPageHeader title="Hidden words" onBack={() => setView("privacy")} />
       <div className="flex flex-col px-6 py-6 gap-6">
         <div className="flex flex-col gap-2">
-          <h2 className="text-[16px] font-medium text-[var(--text)]">Custom words &amp; phrases</h2>
-          <p className="text-[14px] text-[var(--text2)]">
-            Threads containing these words won't appear in your feed or replies.
+          <h2 className="text-[16px] font-medium text-foreground">Custom words &amp; phrases</h2>
+          <p className="text-[14px] text-muted-foreground">
+            Threads containing these words won&apos;t appear in your feed or replies.
           </p>
           {/* Word chips */}
           <div className="flex flex-wrap gap-2 mt-2">
             {hiddenWords.map((word) => (
               <div key={word}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg2)] text-[var(--text)] rounded-full text-[13px] border border-[var(--border)]">
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary text-foreground rounded-full text-[13px] border border-border">
                 <span>{word}</span>
-                <button onClick={() => removeHiddenWord(word)} className="text-[var(--text2)] hover:text-red-500 transition-colors">
+                <button onClick={() => removeHiddenWord(word)} className="text-muted-foreground hover:text-red-500 transition-colors">
                   <X size={12} />
                 </button>
               </div>
@@ -531,12 +754,12 @@ export default function SettingsPage() {
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addHiddenWord(); } }}
               placeholder="Add a word or phrase…"
               maxLength={50}
-              className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--bg2)] border border-[var(--border)] text-[14px] text-[var(--text)] placeholder:text-[var(--text2)] outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="flex-1 px-4 py-2.5 rounded-xl bg-secondary border border-border text-[14px] text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary"
             />
             <button
               onClick={addHiddenWord}
               disabled={!newWord.trim() || addingWord}
-              className="px-4 py-2.5 rounded-xl bg-[var(--accent)] text-[var(--accent-text)] text-[14px] font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity flex items-center gap-1.5"
+              className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-[14px] font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity flex items-center gap-1.5"
             >
               <Plus size={16} /> Add
             </button>
@@ -550,10 +773,10 @@ export default function SettingsPage() {
     <PageShell>
       <SubPageHeader title="Blocked profiles" onBack={() => setView("privacy")} />
       <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-        <Ban size={48} className="text-[var(--text2)] mb-4" />
-        <h2 className="text-[18px] mb-2 text-[var(--text)]">Blocked accounts</h2>
-        <p className="text-[14px] text-[var(--text2)]">
-          Blocked accounts can't find your profile or see your threads.
+        <Ban size={48} className="text-muted-foreground mb-4" />
+        <h2 className="text-[18px] mb-2 text-foreground">Blocked accounts</h2>
+        <p className="text-[14px] text-muted-foreground">
+          Blocked accounts can&apos;t find your profile or see your threads.
         </p>
       </div>
     </PageShell>
@@ -575,9 +798,9 @@ export default function SettingsPage() {
     <PageShell>
       <SubPageHeader title="Report a problem" onBack={() => setView("help")} />
       <div className="flex flex-col px-6 py-6 gap-4">
-        <p className="text-[14px] text-[var(--text2)]">Briefly explain what happened or what's not working.</p>
+        <p className="text-[14px] text-muted-foreground">Briefly explain what happened or what&apos;s not working.</p>
         <textarea rows={6} placeholder="Please include as much detail as possible…"
-          className="w-full resize-none px-4 py-3 rounded-xl bg-[var(--bg2)] border border-[var(--border)] text-[15px] text-[var(--text)] placeholder:text-[var(--text2)] outline-none focus:ring-1 focus:ring-[var(--accent)]"
+          className="w-full resize-none px-4 py-3 rounded-xl bg-secondary border border-border text-[15px] text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary"
         />
         <button onClick={() => toast("Report submitted — thank you!")} className={btnPrimary()}>
           Send report
@@ -590,11 +813,11 @@ export default function SettingsPage() {
     <PageShell>
       <SubPageHeader title="Help Center" onBack={() => setView("help")} />
       <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-        <FileQuestion size={48} className="text-[var(--text2)] mb-4" />
-        <h2 className="text-[18px] mb-2 text-[var(--text)]">How can we help?</h2>
-        <p className="text-[14px] text-[var(--text2)] mb-6">Find answers to common questions about using Threads.</p>
+        <FileQuestion size={48} className="text-muted-foreground mb-4" />
+        <h2 className="text-[18px] mb-2 text-foreground">How can we help?</h2>
+        <p className="text-[14px] text-muted-foreground mb-6">Find answers to common questions about using Threads.</p>
         <button onClick={() => toast("Opening Help Center…")}
-          className="px-6 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text)] text-[14px] font-medium hover:bg-[var(--bg2)] transition-colors">
+          className="px-6 py-2.5 rounded-xl border border-border text-foreground text-[14px] font-medium hover:bg-secondary transition-colors">
           Visit Help Center
         </button>
       </div>
@@ -616,9 +839,9 @@ export default function SettingsPage() {
     <PageShell>
       <SubPageHeader title="Support requests" onBack={() => setView("help")} />
       <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-        <FileText size={48} className="text-[var(--text2)] mb-4" />
-        <h2 className="text-[18px] mb-2 text-[var(--text)]">No open requests</h2>
-        <p className="text-[14px] text-[var(--text2)]">You don't have any support requests right now.</p>
+        <FileText size={48} className="text-muted-foreground mb-4" />
+        <h2 className="text-[18px] mb-2 text-foreground">No open requests</h2>
+        <p className="text-[14px] text-muted-foreground">You don&apos;t have any support requests right now.</p>
       </div>
     </PageShell>
   );
@@ -637,8 +860,8 @@ export default function SettingsPage() {
   if (view === "about-privacy") return (
     <PageShell>
       <SubPageHeader title="Privacy Policy" onBack={() => setView("about")} />
-      <div className="px-6 py-6 text-[14px] text-[var(--text2)] leading-relaxed space-y-4">
-        <p><strong className="text-[var(--text)]">Last updated: June 2026</strong></p>
+      <div className="px-6 py-6 text-[14px] text-muted-foreground leading-relaxed space-y-4">
+        <p><strong className="text-foreground">Last updated: June 2026</strong></p>
         <p>Your privacy is important to us. This Privacy Policy explains how we collect, use, and protect your personal information when you use Threads.</p>
         <p>We only collect data necessary to provide and improve our services. Your data is encrypted and securely stored. We do not sell your personal information to third parties.</p>
       </div>
@@ -648,7 +871,7 @@ export default function SettingsPage() {
   if (view === "about-terms") return (
     <PageShell>
       <SubPageHeader title="Terms of Use" onBack={() => setView("about")} />
-      <div className="px-6 py-6 text-[14px] text-[var(--text2)] leading-relaxed space-y-4">
+      <div className="px-6 py-6 text-[14px] text-muted-foreground leading-relaxed space-y-4">
         <p>By accessing or using Threads, you agree to be bound by these Terms of Use.</p>
         <p>You are responsible for your use of the service and for any content you provide, including compliance with applicable laws, rules, and regulations.</p>
       </div>
@@ -679,11 +902,11 @@ export default function SettingsPage() {
   return (
     <PageShell>
       {/* Header */}
-      <div className="sticky top-0 z-10 flex items-center border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-md px-4 py-4">
-        <button onClick={() => router.back()} className="mr-4 text-[var(--text)] hover:text-[var(--text2)] transition-colors">
+      <div className="sticky top-0 z-10 flex items-center border-b border-border bg-background/90 backdrop-blur-xl px-4 py-4">
+        <button onClick={() => router.back()} className="mr-4 text-foreground hover:text-muted-foreground transition-colors">
           <ChevronRight size={22} className="rotate-180" />
         </button>
-        <h1 className="text-[18px] font-semibold text-[var(--text)]">Settings</h1>
+        <h1 className="text-[18px] text-foreground">Settings</h1>
       </div>
 
       <div className="flex flex-col py-2">
@@ -701,14 +924,14 @@ export default function SettingsPage() {
         <SettingItem icon={<HelpCircle size={22} />} label="Help Center" onClick={() => setView("help")} />
         <SettingItem icon={<Info size={22} />} label="About" onClick={() => setView("about")} />
 
-        <div className="mt-4 border-t border-[var(--border)]">
+        <div className="mt-4 border-t border-border">
           <SettingItem icon={<LogOut size={22} />} label="Log out" danger hideChevron onClick={logout} />
         </div>
       </div>
 
       <div className="mt-auto flex flex-col items-center gap-1 py-8">
-        <span className="text-[12px] text-[var(--text2)]">Threads v1.0.0</span>
-        <span className="text-[11px] text-[var(--text3)]">© 2026</span>
+        <span className="text-[12px] text-muted-foreground">Threads v1.0.0</span>
+        <span className="text-[11px] text-muted-foreground/60">© 2026</span>
       </div>
     </PageShell>
   );
@@ -717,14 +940,14 @@ export default function SettingsPage() {
 // ─── Layout wrapper ───────────────────────────────────────────────────────────
 function PageShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen">
-      <div className="hidden lg:flex flex-col h-screen sticky top-0 border-r border-[var(--border)]">
+    <div className="flex min-h-screen w-full justify-center bg-background text-foreground transition-colors duration-200">
+      <div className="hidden md:flex flex-col h-screen sticky top-0 border-r border-border w-[252px] flex-shrink-0">
         <DesktopSidebar />
       </div>
-      <main className="flex-1 max-w-[622px] w-full mx-auto border-r border-[var(--border)] min-h-screen pb-14 lg:pb-0">
+      <main className="w-full max-w-[622px] border-r border-border min-h-screen pb-14 md:pb-0">
         {children}
       </main>
-      <div className="lg:hidden"><MobileNav /></div>
+      <div className="md:hidden"><MobileNav /></div>
     </div>
   );
 }
@@ -733,7 +956,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-[12px] uppercase tracking-wider text-[var(--text2)] ml-1">{label}</label>
+      <label className="text-[12px] uppercase tracking-wider text-muted-foreground ml-1">{label}</label>
       {children}
     </div>
   );
