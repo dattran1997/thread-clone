@@ -11,7 +11,8 @@ import { memoryStorage } from "multer";
 import { MediaService } from "./media.service";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 
-const IMAGE_MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+const IMAGE_MAX_SIZE = 10 * 1024 * 1024;  // 10 MB
+const AUDIO_MAX_SIZE = 50 * 1024 * 1024;  // 50 MB
 const VIDEO_MAX_SIZE = 500 * 1024 * 1024; // 500 MB
 
 @ApiTags("media")
@@ -30,8 +31,9 @@ export class MediaController {
       fileFilter: (_req, file, cb) => {
         const isImage = file.mimetype.startsWith("image/");
         const isVideo = file.mimetype.startsWith("video/");
-        if (!isImage && !isVideo) {
-          return cb(new BadRequestException("Only image and video files are allowed"), false);
+        const isAudio = file.mimetype.startsWith("audio/");
+        if (!isImage && !isVideo && !isAudio) {
+          return cb(new BadRequestException("Only image, video, and audio files are allowed"), false);
         }
         cb(null, true);
       },
@@ -45,9 +47,13 @@ export class MediaController {
 
     const isImage = file.mimetype.startsWith("image/");
     const isVideo = file.mimetype.startsWith("video/");
+    const isAudio = file.mimetype.startsWith("audio/");
 
     if (isImage && file.size > IMAGE_MAX_SIZE) {
       throw new BadRequestException("Image files must be under 10 MB");
+    }
+    if (isAudio && file.size > AUDIO_MAX_SIZE) {
+      throw new BadRequestException("Audio files must be under 50 MB");
     }
     if (isVideo && file.size > VIDEO_MAX_SIZE) {
       throw new BadRequestException("Video files must be under 500 MB");

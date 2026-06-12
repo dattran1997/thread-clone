@@ -26,6 +26,21 @@ export class ThreadsController {
     return this.threadsService.create(user.id, dto);
   }
 
+  // ⚠️ IMPORTANT: "saved" must be registered BEFORE ":id" so NestJS doesn't
+  // treat the literal string "saved" as a thread ID parameter.
+  @Get("saved")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get threads saved by the logged-in user" })
+  @ApiQuery({ name: "cursor", required: false })
+  @ApiQuery({ name: "limit", required: false })
+  getSaved(
+    @CurrentUser() user: { id: string },
+    @Query("cursor") cursor?: string,
+    @Query("limit") limit?: number,
+  ) {
+    return this.threadsService.findSaved(user.id, cursor, limit);
+  }
+
   @Public()
   @Get(":id")
   @ApiOperation({ summary: "Get thread by ID" })

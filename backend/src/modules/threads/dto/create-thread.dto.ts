@@ -31,7 +31,7 @@ export class CreateThreadDto {
 
   @ApiPropertyOptional({ description: "Parent thread ID for replies" })
   @IsOptional()
-  @IsUUID()
+  @IsString()   // cuid() IDs are not UUID format
   parentId?: string;
 
   @ApiPropertyOptional()
@@ -63,7 +63,7 @@ export class CreateThreadDto {
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(20)
-  @IsUUID(undefined, { each: true })
+  @IsString({ each: true })
   mediaIds?: string[];
 
   @ApiPropertyOptional()

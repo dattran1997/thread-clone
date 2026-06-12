@@ -5,8 +5,8 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { CreateThreadDto } from "./dto/create-thread.dto";
 import { UpdateThreadDto } from "./dto/update-thread.dto";
 
-/** Selects the full Thread shape expected by the frontend */
-const THREAD_SELECT = {
+// ── Viewer-independent base select ────────────────────────────────────────────
+const BASE_SELECT = {
   id: true,
   text: true,
   parentId: true,
@@ -37,18 +37,43 @@ const THREAD_SELECT = {
     orderBy: { order: "asc" as const },
     select: { id: true, url: true, type: true, altText: true, order: true, width: true, height: true },
   },
-  poll: {
-    include: {
-      options: { orderBy: { order: "asc" as const } },
-    },
-  },
-  // Hashtags — include the actual tag text via the relation
   hashtags: {
     select: {
-      hashtag: { select: { id: true, tag: true } },
+      hashtag: { select: { tag: true } },
     },
   },
-};
+} as const;
+
+/** Build the full Prisma select object, injecting viewer-dependent fields */
+function makeSelect(viewerId?: string) {
+  return {
+    ...BASE_SELECT,
+    // Like / repost / save state for this viewer
+    likes:   viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
+    reposts: viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
+    saves:   viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
+    // Poll with per-option vote count + viewer vote
+    poll: {
+      select: {
+        id: true,
+        expiresAt: true,
+        options: {
+          orderBy: { order: "asc" as const },
+          select: {
+            id: true,
+            text: true,
+            order: true,
+            voteCount: true,
+            // Which options did this viewer vote on?
+            votes: viewerId
+              ? { where: { userId: viewerId }, select: { userId: true } }
+              : false,
+          },
+        },
+      },
+    },
+  } as const;
+}
 
 @Injectable()
 export class ThreadsService {
@@ -97,7 +122,7 @@ export class ThreadsService {
       select: { id: true },
     });
 
-    // Wire media if provided
+    // Wire media
     if (dto.mediaIds?.length) {
       await this.prisma.threadMedia.updateMany({
         where: { id: { in: dto.mediaIds } },
@@ -105,17 +130,18 @@ export class ThreadsService {
       });
     }
 
-    // Process hashtags via upsert into Hashtag table + ThreadHashtag join
-    if (dto.hashtags?.length) {
-      for (const tag of dto.hashtags) {
-        const hashtag = await this.prisma.hashtag.upsert({
+    // Process hashtags found in text OR explicitly passed
+    const hashtagsToProcess = dto.hashtags ?? extractHashtags(dto.text);
+    if (hashtagsToProcess.length) {
+      for (const tag of hashtagsToProcess) {
+        const ht = await this.prisma.hashtag.upsert({
           where: { tag },
           create: { tag, threadCount: 1 },
           update: { threadCount: { increment: 1 } },
         });
         await this.prisma.threadHashtag.create({
-          data: { threadId: thread.id, hashtagId: hashtag.id },
-        }).catch(() => { /* ignore duplicate */ });
+          data: { threadId: thread.id, hashtagId: ht.id },
+        }).catch(() => {});
       }
     }
 
@@ -127,7 +153,6 @@ export class ThreadsService {
       });
     }
 
-    // Fetch and return the full thread shape
     return this.fetchFull(thread.id, userId);
   }
 
@@ -135,17 +160,13 @@ export class ThreadsService {
   async findOne(id: string, viewerId?: string) {
     const thread = await this.prisma.thread.findUnique({
       where: { id },
-      select: {
-        ...THREAD_SELECT,
-        likes:   viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
-        reposts: viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
-        saves:   viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
-      },
+      select: makeSelect(viewerId),
     });
     if (!thread || thread.status === "DELETED") throw new NotFoundException("Thread not found");
 
-    // Increment view count (fire-and-forget)
-    this.prisma.thread.update({ where: { id }, data: { viewCount: { increment: 1 } } }).catch(() => {});
+    this.prisma.thread
+      .update({ where: { id }, data: { viewCount: { increment: 1 } } })
+      .catch(() => {});
 
     return this.withViewerState(thread, viewerId);
   }
@@ -159,7 +180,7 @@ export class ThreadsService {
       take: limit + 1,
       ...(cursor && { cursor: { id: cursor }, skip: 1 }),
       orderBy: { createdAt: "asc" },
-      select: THREAD_SELECT,
+      select: makeSelect(viewerId), // ← now includes viewer state for replies too
     });
     const hasMore = replies.length > limit;
     return {
@@ -182,22 +203,23 @@ export class ThreadsService {
       throw new UnprocessableEntityException("Edit window has closed (15 minutes)");
     }
 
-    return this.prisma.thread.update({
+    await this.prisma.thread.update({
       where: { id },
       data: {
         ...(dto.text !== undefined && { text: dto.text }),
         ...(dto.topics !== undefined && { topics: dto.topics }),
         isEdited: true,
       },
-      select: THREAD_SELECT,
     });
+
+    return this.fetchFull(id, userId);
   }
 
   // ── Delete ─────────────────────────────────────────────────────────────────
   async delete(id: string, userId: string) {
     const thread = await this.prisma.thread.findUnique({
       where: { id },
-      select: { authorId: true, status: true },
+      select: { authorId: true, status: true, parentId: true },
     });
     if (!thread || thread.status === "DELETED") throw new NotFoundException("Thread not found");
     if (thread.authorId !== userId) throw new ForbiddenException();
@@ -206,6 +228,14 @@ export class ThreadsService {
       where: { id },
       data: { status: "DELETED" },
     });
+
+    // Decrement parent reply count
+    if (thread.parentId) {
+      await this.prisma.thread.update({
+        where: { id: thread.parentId },
+        data: { replyCount: { decrement: 1 } },
+      }).catch(() => {});
+    }
   }
 
   // ── Vote poll ──────────────────────────────────────────────────────────────
@@ -215,16 +245,13 @@ export class ThreadsService {
       include: { poll: true },
     });
     if (!option) throw new NotFoundException("Poll option not found");
+    if (option.poll.threadId !== threadId) throw new NotFoundException("Poll option not found");
     if (new Date() > option.poll.expiresAt) {
       throw new UnprocessableEntityException("Poll has closed");
     }
 
-    // Check if user already voted on any option of this poll
     const existing = await this.prisma.pollVote.findFirst({
-      where: {
-        userId,
-        option: { pollId: option.pollId },
-      },
+      where: { userId, option: { pollId: option.pollId } },
     });
     if (existing) throw new UnprocessableEntityException("Already voted");
 
@@ -236,7 +263,7 @@ export class ThreadsService {
       }),
     ]);
 
-    return this.findOne(threadId, userId);
+    return this.fetchFull(threadId, userId);
   }
 
   // ── Profile threads ────────────────────────────────────────────────────────
@@ -254,7 +281,6 @@ export class ThreadsService {
     } else if (type === "replies") {
       where = { ...where, authorId: userId, parentId: { not: null } };
     } else {
-      // reposts — find thread IDs the user reposted
       const reposts = await this.prisma.threadRepost.findMany({
         where: { userId },
         select: { threadId: true },
@@ -270,7 +296,7 @@ export class ThreadsService {
       take: limit + 1,
       ...(cursor && { cursor: { id: cursor }, skip: 1 }),
       orderBy: { createdAt: "desc" },
-      select: THREAD_SELECT,
+      select: makeSelect(viewerId),
     });
     const hasMore = items.length > limit;
     const data = items.slice(0, limit);
@@ -281,37 +307,102 @@ export class ThreadsService {
     };
   }
 
+  // ── Saved threads list ─────────────────────────────────────────────────────
+  async findSaved(userId: string, cursor?: string, limit = 20) {
+    const saves = await this.prisma.threadSave.findMany({
+      where: { userId },
+      take: limit + 1,
+      ...(cursor && {
+        cursor: { userId_threadId: { userId, threadId: cursor } },
+        skip: 1,
+      }),
+      orderBy: { createdAt: "desc" },
+      select: { threadId: true },
+    });
+
+    const hasMore = saves.length > limit;
+    const ids = saves.slice(0, limit).map((s) => s.threadId);
+
+    const threads = await this.prisma.thread.findMany({
+      where: { id: { in: ids }, status: "ACTIVE" },
+      select: makeSelect(userId),
+    });
+
+    // Preserve save order
+    const ordered = ids.map((id) => threads.find((t) => t.id === id)).filter(Boolean) as typeof threads;
+
+    return {
+      data: ordered.map((t) => this.withViewerState(t, userId)),
+      nextCursor: hasMore ? ids[ids.length - 1] : null,
+      hasMore,
+    };
+  }
+
   // ── Increment view count ───────────────────────────────────────────────────
   async incrementView(id: string) {
     await this.prisma.thread.update({
       where: { id },
       data: { viewCount: { increment: 1 } },
-    }).catch(() => {}); // silently ignore if thread not found
+    }).catch(() => {});
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   private async fetchFull(id: string, viewerId?: string) {
     const thread = await this.prisma.thread.findUniqueOrThrow({
       where: { id },
-      select: {
-        ...THREAD_SELECT,
-        likes:   viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
-        reposts: viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
-        saves:   viewerId ? { where: { userId: viewerId }, select: { userId: true } } : false,
-      },
+      select: makeSelect(viewerId),
     });
     return this.withViewerState(thread, viewerId);
   }
 
-  private withViewerState(thread: any, viewerId?: string) {
+  private withViewerState(raw: any, viewerId?: string) {
+    // Map hashtags from join-table objects → plain string[]
+    const hashtags: string[] = (raw.hashtags ?? []).map(
+      (h: { hashtag: { tag: string } }) => h.hashtag.tag,
+    );
+
+    // Compute poll state
+    let poll: any = null;
+    if (raw.poll) {
+      const totalVotes = (raw.poll.options as any[]).reduce(
+        (sum: number, o: any) => sum + (o.voteCount ?? 0),
+        0,
+      );
+      const votedOption = (raw.poll.options as any[]).find(
+        (o: any) => (o.votes?.length ?? 0) > 0,
+      );
+      poll = {
+        id: raw.poll.id,
+        expiresAt: raw.poll.expiresAt,
+        totalVotes,
+        userVoteOptionId: votedOption?.id ?? null,
+        options: (raw.poll.options as any[]).map((o: any) => ({
+          id: o.id,
+          text: o.text,
+          order: o.order,
+          voteCount: o.voteCount,
+          hasVoted: (o.votes?.length ?? 0) > 0,
+        })),
+      };
+    }
+
     return {
-      ...thread,
-      isLiked:    viewerId ? (thread.likes?.length > 0)   : false,
-      isReposted: viewerId ? (thread.reposts?.length > 0) : false,
-      isSaved:    viewerId ? (thread.saves?.length > 0)   : false,
+      ...raw,
+      hashtags,
+      poll,
+      isLiked:    viewerId ? ((raw.likes?.length  ?? 0) > 0) : false,
+      isReposted: viewerId ? ((raw.reposts?.length ?? 0) > 0) : false,
+      isSaved:    viewerId ? ((raw.saves?.length   ?? 0) > 0) : false,
+      // Remove raw relation arrays from response
       likes:   undefined,
       reposts: undefined,
       saves:   undefined,
     };
   }
+}
+
+// ── Utility: extract #hashtag words from text ─────────────────────────────────
+function extractHashtags(text: string): string[] {
+  const matches = text.match(/#([a-zA-Z]\w{0,49})/g) ?? [];
+  return [...new Set(matches.map((m) => m.slice(1).toLowerCase()))];
 }

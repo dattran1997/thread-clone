@@ -7,6 +7,7 @@ export interface AuthUser {
   displayName: string;
   avatarUrl: string | null;
   role: string;
+  emailVerified: boolean;
 }
 
 interface AuthStore {

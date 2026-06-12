@@ -55,6 +55,7 @@ enum ReportStatus {
 enum MediaType {
   IMAGE
   VIDEO
+  AUDIO
 }
 
 // ─────────────────────────────────────────────
@@ -78,7 +79,9 @@ model User {
   isActive      Boolean   @default(true)
   followerCount Int       @default(0)
   role          Role      @default(USER)
-  emailVerified Boolean   @default(false)
+  emailVerified              Boolean   @default(false)
+  emailVerificationToken     String?
+  emailVerificationExpires   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
@@ -211,12 +214,12 @@ model Thread {
 
 model ThreadMedia {
   id       String    @id @default(cuid())
-  threadId String
-  thread   Thread    @relation(fields: [threadId], references: [id])
+  threadId String?
+  thread   Thread?   @relation(fields: [threadId], references: [id], onDelete: Cascade)
   url      String
   type     MediaType
   altText  String?
-  order    Int
+  order    Int       @default(0)
   width    Int?
   height   Int?
 

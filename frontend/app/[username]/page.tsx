@@ -9,7 +9,7 @@ import { PostCard, Thread } from "@/components/thread/PostCard";
 import { PostCardSkeleton } from "@/components/ui/Skeleton";
 import { DesktopSidebar } from "@/components/shell/DesktopSidebar";
 import { MobileNav } from "@/components/shell/MobileNav";
-import { BackIcon, LinkIcon } from "@/components/ui/Icons";
+import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -74,11 +74,11 @@ export default function ProfilePage() {
 
   if (loading && !profile) {
     return (
-      <div className="flex min-h-screen">
-        <div className="hidden lg:flex flex-col h-screen sticky top-0 border-r border-[var(--border)]">
+      <div className="flex min-h-screen w-full justify-center bg-background text-foreground transition-colors duration-200">
+        <div className="hidden md:flex flex-col h-screen sticky top-0 border-r border-border w-[252px] flex-shrink-0">
           <DesktopSidebar />
         </div>
-        <main className="flex-1 max-w-[622px] mx-auto">
+        <main className="w-full max-w-[622px] border-r border-border min-h-screen">
           <div className="p-4 space-y-4">
             {[...Array(3)].map((_, i) => <PostCardSkeleton key={i} />)}
           </div>
@@ -90,26 +90,26 @@ export default function ProfilePage() {
   if (!profile) return null;
 
   return (
-    <div className="flex min-h-screen">
-      <div className="hidden lg:flex flex-col h-screen sticky top-0 border-r border-[var(--border)]">
+    <div className="flex min-h-screen w-full justify-center bg-background text-foreground transition-colors duration-200">
+      <div className="hidden md:flex flex-col h-screen sticky top-0 border-r border-border w-[252px] flex-shrink-0">
         <DesktopSidebar />
       </div>
 
-      <main className="flex-1 max-w-[622px] mx-auto border-r border-[var(--border)] min-h-screen pb-14 lg:pb-0">
+      <main className="w-full max-w-[622px] border-r border-border min-h-screen pb-14 md:pb-0">
         {/* Header */}
-        <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3 bg-[var(--bg-blur)] backdrop-blur-md border-b border-[var(--border)]">
-          <button onClick={() => router.back()} className="p-1 text-[var(--text2)] hover:text-[var(--text)]">
-            <BackIcon size={20} />
+        <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-4 bg-background/90 backdrop-blur-xl border-b border-border">
+          <button onClick={() => router.back()} className="text-foreground hover:text-muted-foreground transition-colors">
+            <ChevronLeft size={24} />
           </button>
-          <span className="font-semibold text-[var(--text)]">{profile.displayName}</span>
+          <span className="font-semibold text-foreground">{profile.displayName}</span>
         </div>
 
         {/* Profile info */}
-        <div className="px-6 py-6">
+        <div className="flex flex-col px-6 py-6">
           <div className="flex items-start justify-between">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-1.5">
-                <h1 className="text-[24px] font-bold text-[var(--text)]">{profile.displayName}</h1>
+                <h1 className="text-[24px] font-bold text-foreground">{profile.displayName}</h1>
                 {profile.isVerified && (
                   <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-label="Verified">
                     <circle cx="10" cy="10" r="10" fill="#0095F6"/>
@@ -118,43 +118,51 @@ export default function ProfilePage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <p className="text-[14px] text-[var(--text2)]">@{profile.username}</p>
-                <span className="rounded-full bg-[var(--bg2)] px-2 py-0.5 text-[11px] text-[var(--text2)]">threads.net</span>
+                <p className="text-[14px] text-muted-foreground">{profile.username}</p>
+                <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">threads.net</span>
               </div>
             </div>
             <Avatar src={profile.avatarUrl} alt={profile.displayName} size={84} />
           </div>
 
           {profile.notes && (
-            <p className="text-[15px] text-[var(--text2)] mt-4 italic">{profile.notes}</p>
+            <p className="text-[15px] text-muted-foreground mt-4 italic">{profile.notes}</p>
           )}
 
-          {profile.bio && <p className="text-[15px] text-[var(--text)] mt-4 leading-relaxed">{profile.bio}</p>}
+          {profile.bio && (
+            <p className="text-[15px] text-foreground mt-4 leading-relaxed">{profile.bio}</p>
+          )}
 
-          <div className="flex items-center gap-3 mt-4 text-[14px] text-[var(--text2)]">
-            <span><strong className="text-[var(--text)]">{profile.followerCount}</strong> followers</span>
-            <span className="text-[var(--text3)]">·</span>
-            <span><strong className="text-[var(--text)]">{profile.followingCount}</strong> following</span>
-          </div>
-
-          {/* Topics */}
+          {/* Topic tags */}
           {profile.topics.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-4">
               {profile.topics.map((t) => (
                 <Link key={t} href={`/search?q=${encodeURIComponent(t)}`}
-                  className="px-3 py-1 rounded-full bg-[var(--bg2)] text-[13px] text-[var(--text2)] hover:bg-[var(--bg3)] transition-colors">
+                  className="rounded-full bg-secondary px-3 py-1 text-[13px] text-muted-foreground hover:bg-muted transition-colors">
                   {t}
                 </Link>
               ))}
             </div>
           )}
 
+          {/* Stats + action buttons row */}
+          <div className="mt-6 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-[14px]">
+              <span className="text-foreground font-semibold">{profile.followerCount}</span>
+              <span className="text-muted-foreground">followers</span>
+              <span className="mx-1 text-muted-foreground/60">·</span>
+              <span className="text-foreground font-semibold">{profile.followingCount}</span>
+              <span className="text-muted-foreground">following</span>
+            </div>
+          </div>
+
+          {/* Links */}
           {profile.links.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-3">
               {profile.links.map((link) => (
                 <a key={link} href={link} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-[13px] text-blue-400 hover:underline">
-                  <LinkIcon size={12} /> {link.replace(/^https?:\/\//, "").split("/")[0]}
+                  className="text-[13px] text-muted-foreground hover:text-foreground hover:underline transition-colors">
+                  {link.replace(/^https?:\/\//, "").split("/")[0]}
                 </a>
               ))}
             </div>
@@ -165,12 +173,12 @@ export default function ProfilePage() {
             {isOwn ? (
               <>
                 <Link href="/settings"
-                  className="flex-1 py-3 text-center rounded-xl border border-[var(--border)] text-[15px] font-semibold hover:bg-[var(--hover-overlay)] transition-colors">
+                  className="flex-1 py-3 text-center rounded-xl border border-border text-[15px] font-semibold text-foreground hover:bg-foreground/5 transition-colors">
                   Edit profile
                 </Link>
                 <button
                   onClick={() => { navigator.clipboard.writeText(window.location.href); toast("Link copied"); }}
-                  className="flex-1 py-3 rounded-xl border border-[var(--border)] text-[15px] font-semibold hover:bg-[var(--hover-overlay)] transition-colors">
+                  className="flex-1 py-3 rounded-xl border border-border text-[15px] font-semibold text-foreground hover:bg-foreground/5 transition-colors">
                   Share profile
                 </button>
               </>
@@ -181,13 +189,13 @@ export default function ProfilePage() {
                   className={cn(
                     "flex-1 py-3 rounded-xl text-[15px] font-semibold transition-colors",
                     following
-                      ? "border border-[var(--border)] text-[var(--text)] hover:bg-[var(--hover-overlay)]"
-                      : "bg-[var(--accent)] text-[var(--accent-text)] hover:opacity-90",
+                      ? "border border-border text-foreground hover:bg-foreground/5"
+                      : "bg-primary text-primary-foreground hover:opacity-90",
                   )}>
                   {following ? "Following" : "Follow"}
                 </button>
                 <Link href={`/messages?user=${profile.id}`}
-                  className="flex-1 py-3 text-center rounded-xl border border-[var(--border)] text-[15px] font-semibold hover:bg-[var(--hover-overlay)] transition-colors">
+                  className="flex-1 py-3 text-center rounded-xl border border-border text-[15px] font-semibold text-foreground hover:bg-foreground/5 transition-colors">
                   Message
                 </Link>
               </>
@@ -196,37 +204,43 @@ export default function ProfilePage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-[var(--border)] sticky top-14 z-10 bg-[var(--bg)]">
+        <div className="flex border-b border-border sticky top-[57px] z-10 bg-background">
           {(["posts", "replies", "reposts"] as ProfileTab[]).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={cn(
                 "relative flex-1 py-4 text-[15px] font-medium capitalize transition-colors",
-                tab === t
-                  ? "text-[var(--text)]"
-                  : "text-[var(--text2)] hover:text-[var(--text)]",
+                tab === t ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}>
               {t}
               {tab === t && (
-                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--text)] rounded-full" />
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground rounded-full" />
               )}
             </button>
           ))}
         </div>
 
-        {/* Threads */}
+        {/* Thread list */}
         {loading ? (
           [...Array(3)].map((_, i) => <PostCardSkeleton key={i} />)
         ) : threads.length === 0 ? (
-          <div className="text-center py-16 text-[var(--text2)] text-sm">
+          <div className="text-center py-16 text-muted-foreground text-sm">
             No {tab} yet
           </div>
         ) : (
-          threads.map((t) => <PostCard key={t.id} thread={t} />)
+          threads.map((t) => (
+            <PostCard
+              key={t.id}
+              thread={t}
+              onDelete={(deletedId) =>
+                setThreads((prev) => prev.filter((x) => x.id !== deletedId))
+              }
+            />
+          ))
         )}
       </main>
 
-      <div className="hidden xl:block"><RightPanel /></div>
-      <div className="lg:hidden"><MobileNav /></div>
+      <div className="hidden lg:flex w-[310px] flex-shrink-0"><RightPanel /></div>
+      <div className="md:hidden"><MobileNav /></div>
     </div>
   );
 }

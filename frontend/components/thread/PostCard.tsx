@@ -26,7 +26,7 @@ interface Poll {
   expiresAt: string; userVoteOptionId: string | null;
 }
 interface Media {
-  id: string; url: string; type: "IMAGE" | "VIDEO";
+  id: string; url: string; type: "IMAGE" | "VIDEO" | "AUDIO";
   altText: string | null; order: number;
 }
 
@@ -68,20 +68,20 @@ function PollBlock({ poll, threadId, onVoted }: { poll: Poll; threadId: string; 
           <button key={opt.id} onClick={() => vote(opt.id)}
             disabled={hasVoted || expired || !user}
             className={cn(
-              "relative w-full rounded-xl border border-[var(--border)] overflow-hidden text-left transition-all hover:border-[var(--text2)] disabled:cursor-default",
-              opt.id === poll.userVoteOptionId && "border-[var(--accent)]",
+              "relative w-full rounded-xl border border-border overflow-hidden text-left transition-all hover:border-muted-foreground disabled:cursor-default",
+              opt.id === poll.userVoteOptionId && "border-primary",
             )}>
             {(hasVoted || expired) && (
-              <div className="absolute inset-y-0 left-0 bg-[var(--bg2)] transition-all" style={{ width: `${pct}%` }} />
+              <div className="absolute inset-y-0 left-0 bg-secondary transition-all" style={{ width: `${pct}%` }} />
             )}
             <div className="relative flex justify-between px-3 py-2.5 text-sm">
-              <span className={cn("font-medium", opt.id === poll.userVoteOptionId && "text-[var(--accent)]")}>{opt.text}</span>
-              {(hasVoted || expired) && <span className="text-[var(--text2)]">{pct}%</span>}
+              <span className={cn("font-medium text-foreground", opt.id === poll.userVoteOptionId && "text-primary")}>{opt.text}</span>
+              {(hasVoted || expired) && <span className="text-muted-foreground">{pct}%</span>}
             </div>
           </button>
         );
       })}
-      <p className="text-xs text-[var(--text2)]">
+      <p className="text-xs text-muted-foreground">
         {poll.totalVotes} votes · {expired ? "Closed" : `Closes ${relativeTime(poll.expiresAt)}`}
       </p>
     </div>
@@ -108,33 +108,30 @@ function QuoteDialog({ thread, onClose }: { thread: Thread; onClose: () => void 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={onClose}>
-      <div className="w-full max-w-[560px] rounded-2xl bg-[var(--bg2)] border border-[var(--border)] shadow-2xl overflow-hidden"
+      <div className="w-full max-w-[560px] rounded-2xl bg-secondary border border-border shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
-          <button onClick={onClose} className="text-[var(--text2)] text-sm hover:text-[var(--text)]">Cancel</button>
-          <span className="text-sm font-semibold text-[var(--text)]">Quote thread</span>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <button onClick={onClose} className="text-muted-foreground text-sm hover:text-foreground">Cancel</button>
+          <span className="text-sm font-semibold text-foreground">Quote thread</span>
           <button onClick={submit} disabled={!text.trim() || loading}
-            className="px-4 py-1.5 rounded-full bg-[var(--accent)] text-[var(--accent-text)] text-sm font-semibold disabled:opacity-40 transition-opacity">
+            className="px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 transition-opacity">
             {loading ? "Posting…" : "Post"}
           </button>
         </div>
-        {/* Original thread preview */}
-        <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg3)] rounded-none">
+        <div className="px-4 py-3 border-b border-border bg-muted">
           <div className="flex items-center gap-2 mb-1">
             <Avatar src={thread.author.avatarUrl} alt={thread.author.displayName} size={20} />
-            <span className="text-xs font-semibold text-[var(--text)]">{thread.author.displayName}</span>
-            <span className="text-xs text-[var(--text2)]">@{thread.author.username}</span>
+            <span className="text-xs font-semibold text-foreground">{thread.author.displayName}</span>
+            <span className="text-xs text-muted-foreground">@{thread.author.username}</span>
           </div>
-          <p className="text-sm text-[var(--text2)] line-clamp-3">{thread.text}</p>
+          <p className="text-sm text-muted-foreground line-clamp-3">{thread.text}</p>
         </div>
-        {/* Quote compose */}
         <div className="px-4 py-3">
           <textarea value={text} onChange={(e) => setText(e.target.value)} autoFocus rows={3}
             placeholder="Add your thoughts…"
-            className="w-full bg-transparent text-sm text-[var(--text)] placeholder:text-[var(--text3)] resize-none outline-none leading-relaxed" />
+            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none leading-relaxed" />
           <div className="flex justify-end">
-            <span className={cn("text-xs", text.length > MAX ? "text-red-500" : "text-[var(--text3)]")}>{MAX - text.length}</span>
+            <span className={cn("text-xs", text.length > MAX ? "text-destructive" : "text-muted-foreground")}>{MAX - text.length}</span>
           </div>
         </div>
       </div>
@@ -146,15 +143,15 @@ function QuoteDialog({ thread, onClose }: { thread: Thread; onClose: () => void 
 function RepostMenu({ thread, reposted, onRepost, onQuote, onClose }:
   { thread: Thread; reposted: boolean; onRepost: () => void; onQuote: () => void; onClose: () => void }) {
   return (
-    <div className="absolute bottom-full left-0 mb-1 z-30 bg-[var(--bg2)] border border-[var(--border)] rounded-xl shadow-xl overflow-hidden min-w-[160px]"
+    <div className="absolute bottom-full left-0 mb-1 z-30 bg-secondary border border-border rounded-xl shadow-xl overflow-hidden min-w-[160px]"
       onClick={(e) => e.stopPropagation()}>
       <button onClick={() => { onRepost(); onClose(); }}
-        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-[var(--bg3)] text-[var(--text)] transition-colors">
+        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-foreground transition-colors">
         <Repeat2 size={16} className={reposted ? "text-green-500" : ""} />
         {reposted ? "Remove repost" : "Repost"}
       </button>
       <button onClick={() => { onQuote(); onClose(); }}
-        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-[var(--bg3)] text-[var(--text)] transition-colors">
+        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-foreground transition-colors">
         <MessageCircle size={16} />
         Quote
       </button>
@@ -253,185 +250,199 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
 
   return (
     <>
-      <article
+      {/* Figma structure: flex-col wrapper, separator div at bottom */}
+      <div
         onDoubleClick={handleDoubleTap}
-        className="relative flex gap-3 px-4 py-3 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--hover-overlay)] transition-colors group"
+        className="relative flex w-full flex-col cursor-pointer hover:bg-foreground/5 transition-colors"
         onClick={() => router.push(`/threads/${thread.id}`)}
       >
-        {/* Heart burst */}
+        {/* Heart burst overlay */}
         {heartBurst && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-            <Heart size={72} className="text-red-500 animate-[heartPop_0.6s_ease_forwards]" fill="currentColor" />
+            <Heart size={72} className="text-destructive animate-[heartPop_0.6s_ease_forwards]" fill="currentColor" />
           </div>
         )}
 
-        {/* Avatar column */}
-        <div className="flex flex-col items-center flex-shrink-0">
-          <Link href={`/${thread.author.username}`} onClick={(e) => e.stopPropagation()}>
-            <Avatar src={thread.author.avatarUrl} alt={thread.author.displayName} size={40} />
-          </Link>
-          {showReplyLine && <div className="flex-1 w-0.5 bg-[var(--border)] mt-2 rounded-full min-h-[20px]" />}
-        </div>
+        <div className="flex gap-3 px-4 py-3">
+          {/* Avatar column */}
+          <div className="flex flex-col items-center flex-shrink-0">
+            <Link href={`/${thread.author.username}`} onClick={(e) => e.stopPropagation()}>
+              <Avatar src={thread.author.avatarUrl} alt={thread.author.displayName} size={40} />
+            </Link>
+            {showReplyLine && <div className="mt-1 w-[2px] grow bg-muted min-h-[20px]" />}
+          </div>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          {/* Header row */}
-          <div className="flex items-start justify-between gap-2 mb-0.5">
-            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-              <Link href={`/${thread.author.username}`}
-                onClick={(e) => e.stopPropagation()}
-                className="font-semibold text-[15px] text-[var(--text)] hover:underline truncate">
-                {thread.author.displayName}
-              </Link>
-              {thread.author.isVerified && (
-                <svg width={14} height={14} viewBox="0 0 16 16" fill="#60a5fa" className="flex-shrink-0">
-                  <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zm3.78 5.22a.75.75 0 0 0-1.06 0L7 8.94 5.28 7.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.06 0l4.25-4.25a.75.75 0 0 0 0-1.06z" />
-                </svg>
-              )}
-              <span className="text-[13px] text-[var(--text2)] truncate">@{thread.author.username}</span>
-              <span className="text-[13px] text-[var(--text2)] flex-shrink-0">· {relativeTime(thread.createdAt)}</span>
-              {thread.isEdited && <span className="text-[12px] text-[var(--text3)]">· edited</span>}
+          {/* Content */}
+          <div className="flex grow flex-col gap-1 min-w-0">
+            {/* Header row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 min-w-0">
+                <Link href={`/${thread.author.username}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-[14px] text-foreground hover:underline truncate">
+                  {thread.author.displayName}
+                </Link>
+                {thread.author.isVerified && (
+                  <svg width={14} height={14} viewBox="0 0 16 16" fill="#60a5fa" className="flex-shrink-0">
+                    <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zm3.78 5.22a.75.75 0 0 0-1.06 0L7 8.94 5.28 7.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.06 0l4.25-4.25a.75.75 0 0 0 0-1.06z" />
+                  </svg>
+                )}
+                <span className="text-[13px] text-muted-foreground truncate">@{thread.author.username}</span>
+                <span className="text-[13px] text-muted-foreground flex-shrink-0">· {relativeTime(thread.createdAt)}</span>
+                {thread.isEdited && <span className="text-[12px] text-muted-foreground">· edited</span>}
+              </div>
+
+              {/* Bookmark + More */}
+              <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                <button onClick={toggleSave}
+                  className={cn("text-muted-foreground hover:text-foreground transition-colors",
+                    saved && "text-foreground")}>
+                  <Bookmark size={18} fill={saved ? "currentColor" : "none"} />
+                </button>
+                <div className="relative">
+                  <button onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+                    className="text-muted-foreground hover:text-foreground transition-colors">
+                    <MoreHorizontal size={18} />
+                  </button>
+                  {showMenu && (
+                    <div className="absolute right-0 top-6 z-30 bg-secondary border border-border rounded-xl shadow-xl overflow-hidden min-w-[160px]">
+                      <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${location.origin}/threads/${thread.id}`); toast("Link copied"); setShowMenu(false); }}
+                        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-foreground transition-colors">
+                        <Link2 size={15} /> Copy link
+                      </button>
+                      {!isOwn && (
+                        <button onClick={(e) => { e.stopPropagation(); toast("Muted @" + thread.author.username); setShowMenu(false); }}
+                          className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-foreground transition-colors">
+                          <EyeOff size={15} /> Mute
+                        </button>
+                      )}
+                      {!isOwn && (
+                        <button onClick={(e) => { e.stopPropagation(); toast("Report submitted"); setShowMenu(false); }}
+                          className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-destructive transition-colors">
+                          <Flag size={15} /> Report
+                        </button>
+                      )}
+                      {isOwn && canEdit && (
+                        <Link href={`/threads/${thread.id}/edit`} onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-foreground transition-colors">
+                          <PenLine size={15} /> Edit
+                        </Link>
+                      )}
+                      {isOwn && (
+                        <button onClick={handleDelete}
+                          className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-destructive transition-colors">
+                          <Trash2 size={15} /> Delete
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Bookmark + More */}
-            <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-              <button onClick={toggleSave}
-                className={cn("p-1.5 rounded-full transition-colors hover:bg-[var(--bg3)]",
-                  saved ? "text-[var(--accent)]" : "text-[var(--text2)] hover:text-[var(--text)]")}>
-                <Bookmark size={17} fill={saved ? "currentColor" : "none"} />
-              </button>
-              <div className="relative">
-                <button onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-                  className="p-1.5 rounded-full text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg3)] transition-colors">
-                  <MoreHorizontal size={17} />
-                </button>
-                {showMenu && (
-                  <div className="absolute right-0 top-8 z-30 bg-[var(--bg2)] border border-[var(--border)] rounded-xl shadow-xl overflow-hidden min-w-[160px]">
-                    <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${location.origin}/threads/${thread.id}`); toast("Link copied"); setShowMenu(false); }}
-                      className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-[var(--bg3)] text-[var(--text)] transition-colors">
-                      <Link2 size={15} /> Copy link
-                    </button>
-                    {!isOwn && (
-                      <button onClick={(e) => { e.stopPropagation(); toast("Muted @" + thread.author.username); setShowMenu(false); }}
-                        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-[var(--bg3)] text-[var(--text)] transition-colors">
-                        <EyeOff size={15} /> Mute
-                      </button>
+            {/* Thread text */}
+            <p className="text-[15px] leading-[1.5] text-foreground whitespace-pre-wrap break-words">
+              {thread.text}
+            </p>
+
+            {/* Audio media — rendered separately as a horizontal strip */}
+            {thread.media.filter((m) => m.type === "AUDIO").map((m) => (
+              <div key={m.id} className="mt-2 flex items-center gap-2 rounded-xl bg-secondary border border-border px-3 py-2">
+                <audio src={m.url} controls className="h-8 w-full" style={{ colorScheme: "dark" }} />
+              </div>
+            ))}
+
+            {/* Image/Video grid */}
+            {thread.media.filter((m) => m.type !== "AUDIO").length > 0 && (
+              <div className={cn("mt-2 gap-2",
+                thread.media.filter((m) => m.type !== "AUDIO").length === 1 ? "flex" : "grid grid-cols-2")}>
+                {thread.media.filter((m) => m.type !== "AUDIO").slice(0, 4).map((m) => (
+                  <div key={m.id} className="relative aspect-[4/3] bg-muted rounded-xl overflow-hidden border border-border">
+                    {m.type === "IMAGE" ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.url} alt={m.altText ?? ""} className="absolute inset-0 w-full h-full object-cover" />
+                    ) : (
+                      <video src={m.url} className="absolute inset-0 w-full h-full object-cover" controls />
                     )}
-                    {!isOwn && (
-                      <button onClick={(e) => { e.stopPropagation(); toast("Report submitted"); setShowMenu(false); }}
-                        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-[var(--bg3)] text-red-400 transition-colors">
-                        <Flag size={15} /> Report
-                      </button>
-                    )}
-                    {isOwn && canEdit && (
-                      <Link href={`/threads/${thread.id}/edit`} onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-[var(--bg3)] text-[var(--text)] transition-colors">
-                        <PenLine size={15} /> Edit
-                      </Link>
-                    )}
-                    {isOwn && (
-                      <button onClick={handleDelete}
-                        className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-[var(--bg3)] text-red-500 transition-colors">
-                        <Trash2 size={15} /> Delete
-                      </button>
-                    )}
+                  </div>
+                ))}
+                {thread.media.filter((m) => m.type !== "AUDIO").length > 4 && (
+                  <div className="aspect-[4/3] bg-muted rounded-xl flex items-center justify-center text-sm text-muted-foreground">
+                    +{thread.media.filter((m) => m.type !== "AUDIO").length - 4}
                   </div>
                 )}
               </div>
-            </div>
-          </div>
+            )}
 
-          {/* Thread text */}
-          <p className="text-[15px] text-[var(--text)] leading-relaxed whitespace-pre-wrap break-words mt-0.5">
-            {thread.text}
-          </p>
+            {/* Poll */}
+            {poll && (
+              <PollBlock poll={poll} threadId={thread.id}
+                onVoted={async () => {
+                  const updated = await api.get<Thread>(`/threads/${thread.id}`);
+                  setPoll(updated.poll);
+                }} />
+            )}
 
-          {/* Media grid */}
-          {thread.media.length > 0 && (
-            <div className={cn("mt-2 gap-1.5 rounded-xl overflow-hidden",
-              thread.media.length === 1 ? "flex" : "grid grid-cols-2")}>
-              {thread.media.slice(0, 4).map((m) => (
-                <div key={m.id} className="relative aspect-[4/3] bg-[var(--bg3)] rounded-xl overflow-hidden">
-                  {m.type === "IMAGE" ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={m.url} alt={m.altText ?? ""} className="w-full h-full object-cover" />
-                  ) : (
-                    <video src={m.url} className="w-full h-full object-cover" controls />
+            {/* Action row — matches Figma gap-4 layout */}
+            <div className="mt-2 flex items-center justify-between text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-4">
+                {/* Like */}
+                <button onClick={(e) => toggleLike(e)}
+                  className={cn("flex items-center gap-1.5 transition-colors hover:text-destructive",
+                    liked && "text-destructive")}>
+                  <Heart size={20} fill={liked ? "currentColor" : "none"}
+                    className={liked ? "animate-[bounceHeart_0.3s_ease]" : ""} />
+                  <span className="text-[13px]">{fmtN(likeCount)}</span>
+                </button>
+
+                {/* Reply */}
+                <Link href={`/threads/${thread.id}`}
+                  className="flex items-center gap-1.5 transition-colors hover:text-foreground">
+                  <MessageCircle size={20} />
+                  <span className="text-[13px]">{fmtN(thread.replyCount)}</span>
+                </Link>
+
+                {/* Repost */}
+                <div className="relative">
+                  <button onClick={() => setShowRepostMenu(!showRepostMenu)}
+                    className={cn("flex items-center gap-1.5 transition-colors hover:text-foreground",
+                      reposted && "text-green-500")}>
+                    <Repeat2 size={20} />
+                    <span className="text-[13px]">{fmtN(repostCount)}</span>
+                  </button>
+                  {showRepostMenu && (
+                    <RepostMenu thread={thread} reposted={reposted}
+                      onRepost={toggleRepost}
+                      onQuote={() => setShowQuoteDialog(true)}
+                      onClose={() => setShowRepostMenu(false)} />
                   )}
                 </div>
-              ))}
-              {thread.media.length > 4 && (
-                <div className="aspect-[4/3] bg-[var(--bg3)] rounded-xl flex items-center justify-center text-sm text-[var(--text2)]">
-                  +{thread.media.length - 4}
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* Poll */}
-          {poll && (
-            <PollBlock poll={poll} threadId={thread.id}
-              onVoted={async () => {
-                const updated = await api.get<Thread>(`/threads/${thread.id}`);
-                setPoll(updated.poll);
-              }} />
-          )}
+                {/* Share */}
+                <button onClick={share}
+                  className="flex items-center gap-1.5 transition-colors hover:text-foreground">
+                  <Send size={20} />
+                </button>
+              </div>
 
-          {/* Action row */}
-          <div className="flex items-center mt-3 -ml-1" onClick={(e) => e.stopPropagation()}>
-            {/* Like */}
-            <button onClick={(e) => toggleLike(e)}
-              className={cn("flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-colors text-[13px]",
-                liked ? "text-red-500" : "text-[var(--text2)] hover:text-red-400 hover:bg-red-500/10")}>
-              <Heart size={20} fill={liked ? "currentColor" : "none"}
-                className={liked ? "animate-[heartPop_0.3s_ease]" : ""} />
-              <span>{fmtN(likeCount)}</span>
-            </button>
-
-            {/* Reply */}
-            <Link href={`/threads/${thread.id}`}
-              className="flex items-center gap-1.5 px-2 py-1.5 rounded-full text-[13px] text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg3)] transition-colors">
-              <MessageCircle size={20} />
-              <span>{fmtN(thread.replyCount)}</span>
-            </Link>
-
-            {/* Repost */}
-            <div className="relative">
-              <button onClick={() => setShowRepostMenu(!showRepostMenu)}
-                className={cn("flex items-center gap-1.5 px-2 py-1.5 rounded-full text-[13px] transition-colors",
-                  reposted ? "text-green-500" : "text-[var(--text2)] hover:text-green-400 hover:bg-green-500/10")}>
-                <Repeat2 size={20} />
-                <span>{fmtN(repostCount)}</span>
-              </button>
-              {showRepostMenu && (
-                <RepostMenu thread={thread} reposted={reposted}
-                  onRepost={toggleRepost}
-                  onQuote={() => setShowQuoteDialog(true)}
-                  onClose={() => setShowRepostMenu(false)} />
-              )}
-            </div>
-
-            {/* Share */}
-            <button onClick={share}
-              className="flex items-center gap-1.5 px-2 py-1.5 rounded-full text-[13px] text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg3)] transition-colors">
-              <Send size={20} />
-            </button>
-
-            {/* Views — pushed right */}
-            <div className="flex items-center gap-1 ml-auto text-[12px] text-[var(--text3)]">
-              <BarChart2 size={15} />
-              <span>{fmtN(thread.viewCount)}</span>
+              {/* Views */}
+              <div className="flex items-center gap-1.5 text-muted-foreground/80">
+                <BarChart2 size={16} />
+                <span className="text-[12px]">{fmtN(thread.viewCount)}</span>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Figma-style separator at bottom */}
+        <div className="h-[1px] w-full bg-border" />
 
         {/* Close menus when clicking elsewhere */}
         {(showMenu || showRepostMenu) && (
           <div className="fixed inset-0 z-20" onClick={(e) => { e.stopPropagation(); setShowMenu(false); setShowRepostMenu(false); }} />
         )}
-      </article>
+      </div>
 
-      {/* Quote dialog */}
       {showQuoteDialog && (
         <QuoteDialog thread={thread} onClose={() => setShowQuoteDialog(false)} />
       )}
