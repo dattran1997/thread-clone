@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { Avatar } from "@/components/ui/Avatar";
@@ -28,10 +29,18 @@ interface Message {
   createdAt: string;
 }
 
+// Shape returned by POST /messages/start
+interface StartConversationResponse {
+  id: string;
+  updatedAt: string;
+  participants: { userId: string; user: { id: string; username: string; displayName: string; avatarUrl: string | null } }[];
+}
+
 export default function MessagesPage() {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
   const hasHydrated = useAuthStore((s) => s._hasHydrated);
+  const searchParams = useSearchParams();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConv, setActiveConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -46,12 +55,38 @@ export default function MessagesPage() {
     activeConvRef.current = activeConv;
   }, [activeConv]);
 
-  // Load conversation list
+  // Load conversation list, then handle ?user= deep-link
   useEffect(() => {
     if (!user) return;
+    const recipientId = searchParams.get("user");
+
     api.get<{ data: Conversation[] }>("/messages")
-      .then((r) => setConversations(r.data))
+      .then(async (r) => {
+        setConversations(r.data);
+
+        if (recipientId) {
+          // ?user=<userId> — start or open a conversation with that user
+          try {
+            const res = await api.post<StartConversationResponse>("/messages/start", { recipientId });
+            const other = res.participants.find((p) => p.userId !== user.id);
+            const conv: Conversation = {
+              conversationId: res.id,
+              participant: other?.user ?? null,
+              lastMessage: null,
+              unreadCount: 0,
+              updatedAt: res.updatedAt,
+            };
+            // Add to list if it isn't already there
+            setConversations((prev) =>
+              prev.some((c) => c.conversationId === res.id) ? prev : [conv, ...prev],
+            );
+            // Open the chat immediately
+            openConversation(conv);
+          } catch {}
+        }
+      })
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Connect to /messages namespace and listen for real-time messages
