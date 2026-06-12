@@ -1,10 +1,11 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { connectSocket } from "@/lib/ws";
 import {
   Heart, MessageCircle, Repeat2, Send, BarChart2, Bookmark,
-  MoreHorizontal, Link2, EyeOff, Flag, Trash2, PenLine,
+  MoreHorizontal, Link2, EyeOff, Flag, Trash2, PenLine, X,
 } from "lucide-react";
 import { cn, fmtN, relativeTime } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -159,6 +160,100 @@ function RepostMenu({ thread, reposted, onRepost, onQuote, onClose }:
   );
 }
 
+// ─── Report dialog ────────────────────────────────────────────────────────────
+const REPORT_REASONS = [
+  "Spam",
+  "Harassment or bullying",
+  "Hate speech",
+  "Misinformation",
+  "Violence or dangerous content",
+  "Copyright violation",
+  "Other",
+];
+
+function ReportDialog({ thread, onClose }: { thread: Thread; onClose: () => void }) {
+  const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  async function submit() {
+    if (!reason || loading) return;
+    setLoading(true);
+    try {
+      await api.post("/reports", {
+        targetType: "THREAD",
+        targetId: thread.id,
+        reason,
+        note: note.trim() || undefined,
+      });
+      setDone(true);
+      setTimeout(onClose, 1500);
+    } catch {
+      toast("Failed to submit report", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}>
+      <div className="w-full max-w-[400px] rounded-2xl bg-secondary border border-border shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X size={18} />
+          </button>
+          <span className="text-sm font-semibold text-foreground">Report</span>
+          <div className="w-6" />
+        </div>
+
+        {done ? (
+          <div className="px-4 py-8 text-center">
+            <p className="text-[15px] font-semibold text-foreground">Thanks for your report</p>
+            <p className="text-[13px] text-muted-foreground mt-1">We'll review it and take action if needed.</p>
+          </div>
+        ) : (
+          <div className="p-4 flex flex-col gap-3">
+            <p className="text-[14px] text-muted-foreground">Why are you reporting this?</p>
+            <div className="flex flex-col gap-1">
+              {REPORT_REASONS.map((r) => (
+                <button key={r} onClick={() => setReason(r)}
+                  className={cn(
+                    "text-left px-3 py-2.5 rounded-xl text-[14px] transition-colors",
+                    reason === r
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "text-foreground hover:bg-foreground/5",
+                  )}>
+                  {r}
+                </button>
+              ))}
+            </div>
+            {reason && (
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Additional details (optional)"
+                rows={2}
+                maxLength={500}
+                className="bg-background border border-border rounded-xl px-3 py-2 text-[14px] text-foreground placeholder:text-muted-foreground resize-none outline-none focus:border-primary transition-colors"
+              />
+            )}
+            <button
+              onClick={submit}
+              disabled={!reason || loading}
+              className="w-full py-3 rounded-xl bg-destructive text-white text-[14px] font-semibold disabled:opacity-40 hover:opacity-90 transition-opacity"
+            >
+              {loading ? "Submitting…" : "Submit report"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── PostCard ─────────────────────────────────────────────────────────────────
 export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardProps) {
   const router = useRouter();
@@ -174,9 +269,36 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
   const [showMenu, setShowMenu] = useState(false);
   const [showRepostMenu, setShowRepostMenu] = useState(false);
   const [showQuoteDialog, setShowQuoteDialog] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
 
   const isOwn = user?.id === thread.author.id;
   const canEdit = !!thread.editableUntil && new Date() < new Date(thread.editableUntil);
+
+  // ── Subscribe to real-time count updates for this thread ───────────────────
+  useEffect(() => {
+    const accessToken = (() => {
+      try { return JSON.parse(localStorage.getItem("threads-auth") ?? "{}")?.state?.accessToken ?? null; } catch { return null; }
+    })();
+    if (!accessToken) return;
+
+    const socket = connectSocket(accessToken);
+    socket.emit("join-thread", thread.id);
+
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { threadId: string; likeCount?: number; repostCount?: number; replyCount?: number };
+      if (detail.threadId !== thread.id) return;
+      if (detail.likeCount !== undefined) setLikeCount(detail.likeCount);
+      if (detail.repostCount !== undefined) setRepostCount(detail.repostCount);
+    };
+    window.addEventListener("thread-updated", handler);
+
+    return () => {
+      socket.emit("leave-thread", thread.id);
+      window.removeEventListener("thread-updated", handler);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thread.id]);
 
   // Record view on mount (fire-and-forget)
   const [viewed] = useState(() => {
@@ -248,9 +370,27 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
     } catch { toast("Failed to delete", "error"); }
   }
 
+  // ── Mute / Unmute ──────────────────────────────────────────────────────────
+  async function toggleMute(e: React.MouseEvent) {
+    e.stopPropagation();
+    setShowMenu(false);
+    try {
+      if (isMuted) {
+        await api.delete(`/users/${thread.author.id}/mute`);
+        setIsMuted(false);
+        toast(`Unmuted @${thread.author.username}`);
+      } else {
+        await api.post(`/users/${thread.author.id}/mute`, {});
+        setIsMuted(true);
+        toast(`Muted @${thread.author.username}`);
+      }
+    } catch (err: any) {
+      toast(err?.message ?? "Action failed", "error");
+    }
+  }
+
   return (
     <>
-      {/* Figma structure: flex-col wrapper, separator div at bottom */}
       <div
         onDoubleClick={handleDoubleTap}
         className="relative flex w-full flex-col cursor-pointer hover:bg-foreground/5 transition-colors"
@@ -305,19 +445,22 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
                     <MoreHorizontal size={18} />
                   </button>
                   {showMenu && (
-                    <div className="absolute right-0 top-6 z-30 bg-secondary border border-border rounded-xl shadow-xl overflow-hidden min-w-[160px]">
-                      <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${location.origin}/threads/${thread.id}`); toast("Link copied"); setShowMenu(false); }}
+                    <div className="absolute right-0 top-6 z-30 bg-secondary border border-border rounded-xl shadow-xl overflow-hidden min-w-[180px]">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${location.origin}/threads/${thread.id}`); toast("Link copied"); setShowMenu(false); }}
                         className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-foreground transition-colors">
                         <Link2 size={15} /> Copy link
                       </button>
                       {!isOwn && (
-                        <button onClick={(e) => { e.stopPropagation(); toast("Muted @" + thread.author.username); setShowMenu(false); }}
+                        <button onClick={toggleMute}
                           className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-foreground transition-colors">
-                          <EyeOff size={15} /> Mute
+                          <EyeOff size={15} />
+                          {isMuted ? `Unmute @${thread.author.username}` : `Mute @${thread.author.username}`}
                         </button>
                       )}
                       {!isOwn && (
-                        <button onClick={(e) => { e.stopPropagation(); toast("Report submitted"); setShowMenu(false); }}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setShowMenu(false); setShowReportDialog(true); }}
                           className="flex items-center gap-2 w-full px-4 py-3 text-sm hover:bg-foreground/5 text-destructive transition-colors">
                           <Flag size={15} /> Report
                         </button>
@@ -345,7 +488,7 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
               {thread.text}
             </p>
 
-            {/* Audio media — rendered separately as a horizontal strip */}
+            {/* Audio media */}
             {thread.media.filter((m) => m.type === "AUDIO").map((m) => (
               <div key={m.id} className="mt-2 flex items-center gap-2 rounded-xl bg-secondary border border-border px-3 py-2">
                 <audio src={m.url} controls className="h-8 w-full" style={{ colorScheme: "dark" }} />
@@ -360,7 +503,12 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
                   <div key={m.id} className="relative aspect-[4/3] bg-muted rounded-xl overflow-hidden border border-border">
                     {m.type === "IMAGE" ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.url} alt={m.altText ?? ""} className="absolute inset-0 w-full h-full object-cover" />
+                      <img
+                        src={m.url}
+                        alt={m.altText ?? ""}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
                     ) : (
                       <video src={m.url} className="absolute inset-0 w-full h-full object-cover" controls />
                     )}
@@ -383,7 +531,7 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
                 }} />
             )}
 
-            {/* Action row — matches Figma gap-4 layout */}
+            {/* Action row */}
             <div className="mt-2 flex items-center justify-between text-muted-foreground" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-4">
                 {/* Like */}
@@ -434,7 +582,7 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
           </div>
         </div>
 
-        {/* Figma-style separator at bottom */}
+        {/* Separator */}
         <div className="h-[1px] w-full bg-border" />
 
         {/* Close menus when clicking elsewhere */}
@@ -445,6 +593,10 @@ export function PostCard({ thread, onDelete, showReplyLine = false }: PostCardPr
 
       {showQuoteDialog && (
         <QuoteDialog thread={thread} onClose={() => setShowQuoteDialog(false)} />
+      )}
+
+      {showReportDialog && (
+        <ReportDialog thread={thread} onClose={() => setShowReportDialog(false)} />
       )}
     </>
   );

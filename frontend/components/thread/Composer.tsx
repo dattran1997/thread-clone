@@ -6,7 +6,7 @@ import { toast } from "@/components/ui/Toast";
 import { useAuthStore } from "@/stores/auth";
 import { Avatar } from "@/components/ui/Avatar";
 import { cn } from "@/lib/utils";
-import { Image, List, Hash, Ghost, X, Loader2, Mic, MicOff } from "lucide-react";
+import { Image, List, Hash, Ghost, X, Loader2, Mic, MicOff, ChevronDown, Globe, Users, AtSign } from "lucide-react";
 
 const MAX_CHARS = 500;
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
@@ -42,6 +42,9 @@ export function Composer({ parentId, onSuccess, placeholder, autoFocus = false }
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  type ReplyPermission = "EVERYONE" | "FOLLOWING" | "MENTIONED";
+  const [replyPermission, setReplyPermission] = useState<ReplyPermission>("EVERYONE");
+  const [showReplyPicker, setShowReplyPicker] = useState(false);
 
   if (!user) return null;
 
@@ -179,6 +182,7 @@ export function Composer({ parentId, onSuccess, placeholder, autoFocus = false }
         text: text.trim(),
         ...(parentId ? { parentId } : {}),
         ...(isGhost && { isGhost: true }),
+        replyPermission,
         ...(mediaIds.length > 0 && { mediaIds }),
         ...(showPoll && {
           poll: {
@@ -341,6 +345,52 @@ export function Composer({ parentId, onSuccess, placeholder, autoFocus = false }
               <Ghost size={12} />
               Ghost post · disappears in 24 hours
             </p>
+          )}
+
+          {/* Who can reply — only shown on top-level posts */}
+          {!parentId && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowReplyPicker((v) => !v)}
+                className="flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {replyPermission === "EVERYONE" && <Globe size={12} />}
+                {replyPermission === "FOLLOWING" && <Users size={12} />}
+                {replyPermission === "MENTIONED" && <AtSign size={12} />}
+                <span>
+                  {replyPermission === "EVERYONE" && "Anyone can reply"}
+                  {replyPermission === "FOLLOWING" && "Followers can reply"}
+                  {replyPermission === "MENTIONED" && "Mentioned only"}
+                </span>
+                <ChevronDown size={10} />
+              </button>
+              {showReplyPicker && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setShowReplyPicker(false)} />
+                  <div className="absolute bottom-full left-0 mb-1 z-30 bg-secondary border border-border rounded-xl shadow-xl overflow-hidden min-w-[200px]">
+                    {([
+                      { value: "EVERYONE", label: "Anyone can reply", Icon: Globe },
+                      { value: "FOLLOWING", label: "Followers can reply", Icon: Users },
+                      { value: "MENTIONED", label: "Mentioned only", Icon: AtSign },
+                    ] as const).map(({ value, label, Icon }) => (
+                      <button
+                        key={value}
+                        onClick={() => { setReplyPermission(value); setShowReplyPicker(false); }}
+                        className={cn(
+                          "flex items-center gap-3 w-full px-4 py-3 text-[13px] hover:bg-foreground/5 transition-colors",
+                          replyPermission === value ? "text-foreground font-medium" : "text-muted-foreground",
+                        )}
+                      >
+                        <Icon size={14} />
+                        {label}
+                        {replyPermission === value && <span className="ml-auto text-primary">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
           {/* Toolbar */}

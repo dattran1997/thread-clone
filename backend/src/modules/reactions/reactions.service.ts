@@ -1,14 +1,27 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
+import { NotificationsGateway } from "../notifications/notifications.gateway";
 
 @Injectable()
 export class ReactionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: NotificationsGateway,
+  ) {}
 
   private async ensureThread(id: string) {
     const t = await this.prisma.thread.findUnique({ where: { id }, select: { id: true, status: true } });
     if (!t || t.status === "DELETED") throw new NotFoundException("Thread not found");
     return t;
+  }
+
+  /** Fetch current counts and broadcast to all sockets watching this thread */
+  private async broadcastThreadCounts(threadId: string) {
+    const t = await this.prisma.thread.findUnique({
+      where: { id: threadId },
+      select: { likeCount: true, repostCount: true, replyCount: true },
+    });
+    if (t) this.gateway.emitThreadUpdate(threadId, t);
   }
 
   // ── Like ────────────────────────────────────────────────────────────────────
@@ -17,12 +30,13 @@ export class ReactionsService {
     const existing = await this.prisma.threadLike.findUnique({
       where: { userId_threadId: { userId, threadId } },
     });
-    if (existing) return { liked: true }; // idempotent
+    if (existing) return { liked: true };
 
     await this.prisma.$transaction([
       this.prisma.threadLike.create({ data: { userId, threadId } }),
       this.prisma.thread.update({ where: { id: threadId }, data: { likeCount: { increment: 1 } } }),
     ]);
+    this.broadcastThreadCounts(threadId).catch(() => {});
     return { liked: true };
   }
 
@@ -37,6 +51,7 @@ export class ReactionsService {
       this.prisma.threadLike.delete({ where: { userId_threadId: { userId, threadId } } }),
       this.prisma.thread.update({ where: { id: threadId }, data: { likeCount: { decrement: 1 } } }),
     ]);
+    this.broadcastThreadCounts(threadId).catch(() => {});
     return { liked: false };
   }
 
@@ -52,6 +67,7 @@ export class ReactionsService {
       this.prisma.threadRepost.create({ data: { userId, threadId } }),
       this.prisma.thread.update({ where: { id: threadId }, data: { repostCount: { increment: 1 } } }),
     ]);
+    this.broadcastThreadCounts(threadId).catch(() => {});
     return { reposted: true };
   }
 
@@ -66,6 +82,7 @@ export class ReactionsService {
       this.prisma.threadRepost.delete({ where: { userId_threadId: { userId, threadId } } }),
       this.prisma.thread.update({ where: { id: threadId }, data: { repostCount: { decrement: 1 } } }),
     ]);
+    this.broadcastThreadCounts(threadId).catch(() => {});
     return { reposted: false };
   }
 

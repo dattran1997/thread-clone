@@ -3,6 +3,9 @@ import {
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
 import { JwtService } from "@nestjs/jwt";
@@ -47,5 +50,21 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
 
   emitToUser(userId: string, event: string, payload: unknown) {
     this.server.to(`user:${userId}`).emit(event, payload);
+  }
+
+  /** Clients call this when they mount a PostCard so they receive live count updates */
+  @SubscribeMessage("join-thread")
+  async handleJoinThread(@MessageBody() threadId: string, @ConnectedSocket() socket: Socket) {
+    await socket.join(`thread:${threadId}`);
+  }
+
+  @SubscribeMessage("leave-thread")
+  async handleLeaveThread(@MessageBody() threadId: string, @ConnectedSocket() socket: Socket) {
+    await socket.leave(`thread:${threadId}`);
+  }
+
+  /** Called by ReactionsService after a like/repost/reply count changes */
+  emitThreadUpdate(threadId: string, payload: { likeCount?: number; repostCount?: number; replyCount?: number }) {
+    this.server.to(`thread:${threadId}`).emit("thread-updated", { threadId, ...payload });
   }
 }

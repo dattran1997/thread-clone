@@ -32,7 +32,7 @@ export class MediaService {
     // Create a ThreadMedia record with threadId = null.
     // The thread creation service will call threadMedia.updateMany to link it.
     const media = await this.prisma.threadMedia.create({
-      data: { url, type: type as "IMAGE" | "VIDEO", order: 0 },
+      data: { url, type: type as "IMAGE" | "VIDEO" | "AUDIO", order: 0 },
       select: { id: true, url: true, type: true },
     });
 

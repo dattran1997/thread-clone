@@ -29,9 +29,15 @@ export function WsProvider() {
       incrementMessages();
     });
 
+    // Real-time thread count updates — forward to PostCards via window event
+    socket.on("thread-updated", (data: { threadId: string; likeCount?: number; repostCount?: number; replyCount?: number }) => {
+      window.dispatchEvent(new CustomEvent("thread-updated", { detail: data }));
+    });
+
     return () => {
       socket.off("notification");
       socket.off("new-message");
+      socket.off("thread-updated");
     };
   }, [accessToken, incrementUnread, incrementMessages, setUnreadCount]);
 

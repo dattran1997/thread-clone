@@ -33,14 +33,14 @@ export default function LoginPage() {
         "/auth/login",
         form,
       );
-      setAuth(res.user, res.accessToken, res.refreshToken);
 
-      // If email not verified, stay on login page and show the notice
+      // If email not verified, show notice WITHOUT logging the user in
       if (!res.user.emailVerified) {
         setUnverifiedEmail(form.email);
         return;
       }
 
+      setAuth(res.user, res.accessToken, res.refreshToken);
       router.replace("/");
     } catch (err: any) {
       toast(err?.message ?? "Login failed", "error");
