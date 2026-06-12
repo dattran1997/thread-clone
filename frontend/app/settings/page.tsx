@@ -143,18 +143,42 @@ export default function SettingsPage() {
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
   const [pwLoading, setPwLoading] = useState(false);
 
-  // Local UI toggles
-  const [twoFactorApp, setTwoFactorApp] = useState(true);
-  const [saveLogin, setSaveLogin] = useState(true);
-  const [pauseNotifs, setPauseNotifs] = useState(false);
-  const [language, setLanguage] = useState<"English" | "Tiếng Việt">("English");
+  // Forgot password
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+
+  // Sessions (login activity)
+  interface SessionInfo { id: string; createdAt: string; expiresAt: string; }
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
   const [activeSessionMenu, setActiveSessionMenu] = useState<string | null>(null);
+
+  // Local UI toggles
+  const [saveLogin, setSaveLogin] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("threads-save-login") !== "false";
+    }
+    return true;
+  });
+  const [pauseNotifs, setPauseNotifs] = useState(false);
+  const [language] = useState<string>("English");
 
   useEffect(() => {
     if (!user) return;
     api.get<{ isPrivate: boolean }>("/settings").then((s) => setIsPrivate(s.isPrivate)).catch(() => {});
     api.get<{ words: string[] }>("/settings/hidden-words").then((r) => setHiddenWords(r.words)).catch(() => {});
   }, [user]);
+
+  // Load sessions when entering login-activity view
+  useEffect(() => {
+    if (view !== "security-login-activity") return;
+    setSessionsLoading(true);
+    api.get<{ sessions: { id: string; createdAt: string; expiresAt: string }[] }>("/settings/sessions")
+      .then((r) => setSessions(r.sessions))
+      .catch(() => setSessions([]))
+      .finally(() => setSessionsLoading(false));
+  }, [view]);
 
   // Load full profile when entering personal-info view
   useEffect(() => {
@@ -247,6 +271,39 @@ export default function SettingsPage() {
     } finally {
       setAvatarUploading(false);
     }
+  }
+
+  async function sendForgotPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!forgotEmail.trim() || forgotLoading) return;
+    setForgotLoading(true);
+    try {
+      await api.post("/auth/forgot-password", { email: forgotEmail.trim() });
+      setForgotSent(true);
+    } catch {
+      toast("Something went wrong. Try again.", "error");
+    } finally {
+      setForgotLoading(false);
+    }
+  }
+
+  async function revokeSession(sessionId: string) {
+    try {
+      await api.delete(`/settings/sessions/${sessionId}`);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      toast("Session signed out");
+    } catch { toast("Failed to sign out session", "error"); }
+    setActiveSessionMenu(null);
+  }
+
+  async function revokeAllOtherSessions() {
+    if (!confirm("Sign out all other sessions?")) return;
+    try {
+      await api.delete("/settings/sessions");
+      // Keep only the first (most recent = current) session in UI
+      setSessions((prev) => prev.slice(0, 1));
+      toast("All other sessions signed out");
+    } catch { toast("Failed", "error"); }
   }
 
   async function saveProfile() {
@@ -443,13 +500,25 @@ export default function SettingsPage() {
     <PageShell>
       <SubPageHeader title="Language" onBack={() => setView("main")} />
       <div className="flex flex-col py-2">
-        {(["English", "Tiếng Việt"] as const).map((lang) => (
-          <button key={lang} onClick={() => { setLanguage(lang); setView("main"); }}
-            className="flex w-full items-center justify-between px-6 py-4 hover:bg-foreground/5 transition-colors">
+        {/* English — active */}
+        <div className="flex w-full items-center justify-between px-6 py-4 hover:bg-foreground/5 transition-colors">
+          <span className="text-[16px] text-foreground">English</span>
+          <Check size={18} className="text-primary" />
+        </div>
+        <div className="border-t border-border mx-6" />
+        {/* Other languages — coming soon */}
+        {["Tiếng Việt", "日本語", "한국어", "Español", "Français"].map((lang) => (
+          <div
+            key={lang}
+            className="flex w-full items-center justify-between px-6 py-4 opacity-40 cursor-not-allowed"
+          >
             <span className="text-[16px] text-foreground">{lang}</span>
-            {language === lang && <Check size={18} className="text-primary" />}
-          </button>
+            <span className="text-[12px] text-muted-foreground">Coming soon</span>
+          </div>
         ))}
+        <p className="px-6 pt-4 text-[13px] text-muted-foreground">
+          Only English is supported right now. More languages are on the roadmap.
+        </p>
       </div>
     </PageShell>
   );
@@ -492,19 +561,50 @@ export default function SettingsPage() {
 
   if (view === "security-forgot-password") return (
     <PageShell>
-      <SubPageHeader title="Forgot password" onBack={() => setView("security-password")} />
+      <SubPageHeader title="Forgot password" onBack={() => { setView("security-password"); setForgotSent(false); }} />
       <div className="flex flex-col items-center text-center gap-4 py-8 px-6">
         <div className="w-20 h-20 rounded-full border-2 border-primary flex items-center justify-center mb-2">
           <Lock size={36} className="text-primary" />
         </div>
-        <h2 className="text-[20px] font-medium text-foreground">Trouble logging in?</h2>
-        <p className="text-[14px] text-muted-foreground">
-          Enter your email and we&apos;ll send a link to get back into your account.
-        </p>
-        <input type="email" placeholder="Email address" className={cn(inputCls, "w-full mt-2")} />
-        <button onClick={() => toast("Reset link sent")} className={btnPrimary()}>
-          Send reset link
-        </button>
+
+        {forgotSent ? (
+          <>
+            <h2 className="text-[20px] font-medium text-foreground">Check your email</h2>
+            <p className="text-[14px] text-muted-foreground">
+              If an account with <strong>{forgotEmail}</strong> exists, we sent a reset link.
+              It expires in 1 hour.
+            </p>
+            <p className="text-[13px] text-muted-foreground">
+              (In dev mode, check the backend console for the reset URL.)
+            </p>
+            <button
+              onClick={() => { setForgotSent(false); setView("security"); }}
+              className={btnPrimary()}
+            >
+              Back to security
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 className="text-[20px] font-medium text-foreground">Trouble logging in?</h2>
+            <p className="text-[14px] text-muted-foreground">
+              Enter your email and we&apos;ll send a link to reset your password.
+            </p>
+            <form onSubmit={sendForgotPassword} className="w-full flex flex-col gap-3 mt-2">
+              <input
+                type="email"
+                placeholder="Email address"
+                required
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                className={inputCls}
+              />
+              <button type="submit" disabled={forgotLoading} className={btnPrimary(forgotLoading)}>
+                {forgotLoading ? "Sending…" : "Send reset link"}
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </PageShell>
   );
@@ -512,24 +612,17 @@ export default function SettingsPage() {
   if (view === "security-2fa") return (
     <PageShell>
       <SubPageHeader title="Two-factor authentication" onBack={() => setView("security")} />
-      <div className="flex flex-col py-4">
-        <p className="px-6 pb-6 text-[14px] text-muted-foreground border-b border-border">
-          Two-factor authentication protects your account by requiring an additional code when you log in on an unrecognized device.
-        </p>
-        <h2 className="px-6 py-4 text-[16px] font-medium text-foreground">Choose your security method</h2>
-        <div className="flex w-full items-start justify-between px-6 py-4 border-b border-border">
-          <div className="flex flex-col gap-1 pr-6">
-            <span className="text-[16px] text-foreground">Authentication app (recommended)</span>
-            <span className="text-[13px] text-muted-foreground mt-1">Uses Google Authenticator or Duo Mobile.</span>
-          </div>
-          <Toggle checked={twoFactorApp} onChange={() => setTwoFactorApp(!twoFactorApp)} />
+      <div className="flex flex-col items-center justify-center py-16 px-6 text-center gap-4">
+        <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
+          <ShieldCheck size={30} className="text-muted-foreground" />
         </div>
-        <div className="flex w-full items-start justify-between px-6 py-4 border-b border-border opacity-50">
-          <div className="flex flex-col gap-1 pr-6">
-            <span className="text-[16px] text-foreground">Text message (SMS)</span>
-            <span className="text-[13px] text-muted-foreground mt-1">Currently unavailable.</span>
-          </div>
-          <Toggle checked={false} onChange={() => {}} disabled />
+        <h2 className="text-[18px] font-semibold text-foreground">Coming soon</h2>
+        <p className="text-[14px] text-muted-foreground max-w-xs">
+          Two-factor authentication with an authenticator app (TOTP) is being built.
+          Your account is protected by a strong password and JWT token rotation in the meantime.
+        </p>
+        <div className="mt-2 px-4 py-2 rounded-full bg-secondary text-[13px] text-muted-foreground">
+          Planned: TOTP · SMS (optional) · Recovery codes
         </div>
       </div>
     </PageShell>
@@ -537,59 +630,84 @@ export default function SettingsPage() {
 
   if (view === "security-login-activity") return (
     <PageShell>
-      <SubPageHeader title="Login activity" onBack={() => { setView("security"); setActiveSessionMenu(null); }} />
-      <div className="flex flex-col py-2">
-        <h2 className="px-6 py-4 text-[16px] font-medium text-foreground">Where you&apos;re logged in</h2>
-        {[
-          { icon: <Smartphone size={22} />, name: "iPhone 14 Pro", location: "San Francisco, CA", time: "Active now", active: true },
-          { icon: <Monitor size={22} />, name: "Mac OS", location: "San Jose, CA", time: "Yesterday", active: false },
-        ].map((d) => (
-          <div key={d.name} className="relative flex items-center gap-4 px-6 py-4 border-b border-border">
-            <span className={d.active ? "text-foreground" : "text-muted-foreground"}>{d.icon}</span>
-            <div className="flex flex-col flex-1">
-              <span className="text-[15px] text-foreground">{d.location} · {d.name}</span>
-              <span className={cn("text-[13px] mt-0.5", d.active ? "text-primary" : "text-muted-foreground")}>
-                {d.time}
-              </span>
-            </div>
+      <SubPageHeader
+        title="Login activity"
+        onBack={() => { setView("security"); setActiveSessionMenu(null); }}
+        action={
+          sessions.length > 1 ? (
             <button
-              onClick={() => setActiveSessionMenu(activeSessionMenu === d.name ? null : d.name)}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              onClick={revokeAllOtherSessions}
+              className="text-[13px] text-destructive hover:opacity-80"
             >
-              <MoreHorizontal size={20} />
+              Sign out others
             </button>
+          ) : undefined
+        }
+      />
+      <div className="flex flex-col py-2">
+        <p className="px-6 py-3 text-[13px] text-muted-foreground border-b border-border">
+          Active sessions using your refresh token. The newest session is likely your current device.
+        </p>
 
-            {/* Dropdown menu */}
-            {activeSessionMenu === d.name && (
-              <>
-                {/* Transparent overlay to catch outside clicks */}
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setActiveSessionMenu(null)}
-                />
-                {/* Menu */}
-                <div className="absolute right-6 top-12 z-20 min-w-[200px] rounded-2xl border border-border bg-background shadow-xl overflow-hidden">
-                  {!d.active && (
-                    <button
-                      onClick={() => { toast("Flagged as unrecognized — we'll investigate"); setActiveSessionMenu(null); }}
-                      className="flex w-full items-center gap-3 px-4 py-3.5 text-[14px] text-amber-500 hover:bg-foreground/5 transition-colors text-left"
-                    >
-                      <AlertTriangle size={16} />
-                      This wasn&apos;t me
-                    </button>
-                  )}
-                  <button
-                    onClick={() => { toast(d.active ? "Logging out of this device…" : `Logged out of ${d.name}`); setActiveSessionMenu(null); }}
-                    className="flex w-full items-center gap-3 px-4 py-3.5 text-[14px] text-destructive hover:bg-destructive/5 transition-colors text-left border-t border-border first:border-t-0"
-                  >
-                    <LogOut size={16} />
-                    {d.active ? "Log out on this device" : "Log out of this device"}
-                  </button>
-                </div>
-              </>
-            )}
+        {sessionsLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 size={24} className="animate-spin text-muted-foreground" />
           </div>
-        ))}
+        ) : sessions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2 text-center px-6">
+            <Smartphone size={40} className="text-muted-foreground" />
+            <p className="text-[15px] text-foreground font-medium">No active sessions found</p>
+            <p className="text-[13px] text-muted-foreground">You may need to log in again.</p>
+          </div>
+        ) : (
+          sessions.map((s, i) => {
+            const createdAt = new Date(s.createdAt);
+            const isNewest = i === 0;
+            return (
+              <div key={s.id} className="relative flex items-center gap-4 px-6 py-4 border-b border-border">
+                <span className={isNewest ? "text-foreground" : "text-muted-foreground"}>
+                  <Monitor size={22} />
+                </span>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[15px] text-foreground">
+                      Session {sessions.length - i}
+                    </span>
+                    {isNewest && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium">
+                        Current
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[13px] text-muted-foreground truncate">
+                    Created {createdAt.toLocaleDateString()} at {createdAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setActiveSessionMenu(activeSessionMenu === s.id ? null : s.id)}
+                  className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                >
+                  <MoreHorizontal size={20} />
+                </button>
+
+                {activeSessionMenu === s.id && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setActiveSessionMenu(null)} />
+                    <div className="absolute right-6 top-12 z-20 min-w-[180px] rounded-2xl border border-border bg-background shadow-xl overflow-hidden">
+                      <button
+                        onClick={() => revokeSession(s.id)}
+                        className="flex w-full items-center gap-3 px-4 py-3.5 text-[14px] text-destructive hover:bg-destructive/5 transition-colors text-left"
+                      >
+                        <LogOut size={16} />
+                        Sign out this session
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
     </PageShell>
   );
@@ -598,12 +716,27 @@ export default function SettingsPage() {
     <PageShell>
       <SubPageHeader title="Saved login info" onBack={() => setView("security")} />
       <div className="flex flex-col py-2">
-        <div className="flex w-full items-center justify-between px-6 py-4 border-b border-border">
-          <span className="text-[16px] text-foreground">Saved login info</span>
-          <Toggle checked={saveLogin} onChange={() => setSaveLogin(!saveLogin)} />
+        <div className="flex w-full items-start justify-between px-6 py-4 border-b border-border gap-4">
+          <div className="flex flex-col gap-1">
+            <span className="text-[16px] text-foreground">Remember login</span>
+            <span className="text-[13px] text-muted-foreground">
+              When enabled, your session persists in this browser until you log out.
+              When disabled, you&apos;ll be signed out when the browser closes.
+            </span>
+          </div>
+          <Toggle
+            checked={saveLogin}
+            onChange={() => {
+              const next = !saveLogin;
+              setSaveLogin(next);
+              localStorage.setItem("threads-save-login", String(next));
+              toast(next ? "Login will be remembered" : "Login cleared on browser close");
+            }}
+          />
         </div>
         <p className="px-6 py-4 text-[13px] text-muted-foreground">
-          We&apos;ll remember your account info on this device so you don&apos;t need to enter it again.
+          Your active sessions are listed under <strong className="text-foreground">Login activity</strong>.
+          To fully sign out everywhere, revoke all sessions from there.
         </p>
       </div>
     </PageShell>
@@ -914,7 +1047,7 @@ export default function SettingsPage() {
         <SettingItem icon={<User size={22} />} label="Personal information" onClick={() => setView("personal-info")} />
         <SettingItem icon={<Shield size={22} />} label="Security" onClick={() => setView("security")} />
         <SettingItem icon={<Palette size={22} />} label="Appearance" value={theme.charAt(0).toUpperCase() + theme.slice(1)} onClick={() => setView("appearance")} />
-        <SettingItem icon={<Languages size={22} />} label="Language" value={language} onClick={() => setView("language")} />
+        <SettingItem icon={<Languages size={22} />} label="Language" value="English" onClick={() => setView("language")} />
 
         <SectionLabel>Preferences</SectionLabel>
         <SettingItem icon={<Bell size={22} />} label="Notifications" onClick={() => setView("notifications")} />

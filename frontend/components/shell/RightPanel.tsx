@@ -15,7 +15,7 @@ export function RightPanel() {
       {/* Search bar */}
       <Link
         href="/search"
-        className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-[var(--bg2)] text-[var(--text2)] text-[15px] hover:bg-[var(--bg3)] transition-colors"
+        className="flex items-center gap-3 px-4 py-3 rounded-xl bg-secondary text-muted-foreground text-[15px] hover:bg-muted transition-colors"
       >
         <Search size={18} className="flex-shrink-0" />
         <span>Search</span>
@@ -23,7 +23,7 @@ export function RightPanel() {
 
       {/* Trending widget */}
       <section>
-        <h3 className="text-[15px] text-[var(--text)] mb-4">Trending</h3>
+        <h3 className="text-[15px] font-semibold text-foreground mb-4">Trending</h3>
         <div className="flex flex-col gap-4">
           {TRENDING.map((item, i) => (
             <Link
@@ -31,21 +31,21 @@ export function RightPanel() {
               href={`/search?q=${encodeURIComponent("#" + item.tag)}`}
               className="flex flex-col hover:opacity-80 transition-opacity"
             >
-              <span className="text-[13px] text-[var(--text2)]">{i + 1} · Trending</span>
-              <span className="text-[15px] text-[var(--text)] font-medium">#{item.tag}</span>
-              <span className="text-[13px] text-[var(--text2)]">{item.count} threads</span>
+              <span className="text-[12px] text-muted-foreground">{i + 1} · Trending</span>
+              <span className="text-[15px] text-foreground font-semibold">#{item.tag}</span>
+              <span className="text-[12px] text-muted-foreground">{item.count} threads</span>
             </Link>
           ))}
         </div>
       </section>
 
-      {/* Suggested users widget */}
+      {/* Suggested users */}
       <section>
-        <h3 className="text-[15px] text-[var(--text)] mb-4">Suggested for you</h3>
-        <p className="text-[14px] text-[var(--text2)]">Follow people to see their threads here.</p>
+        <h3 className="text-[15px] font-semibold text-foreground mb-4">Suggested for you</h3>
+        <p className="text-[14px] text-muted-foreground">Follow people to see their threads here.</p>
         <Link
           href="/search"
-          className="text-[14px] text-[var(--text)] font-medium mt-2 inline-block hover:underline"
+          className="text-[14px] text-foreground font-medium mt-2 inline-block hover:underline"
         >
           Find people →
         </Link>

@@ -18,9 +18,9 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // data-theme="dark" is the SSR default; ThemeProvider overrides it client-side
-    <html lang="en" data-theme="dark">
-      <body className="min-h-screen bg-[var(--bg)] text-[var(--text)] antialiased">
+    // SSR default = dark; ThemeProvider overrides client-side via .dark class
+    <html lang="en" className="dark">
+      <body className="min-h-screen bg-background text-foreground antialiased">
         <ThemeProvider>
           <WsProvider />
           {children}

@@ -72,25 +72,25 @@ export default function AdminPage() {
   if (!user || user.role !== "ADMIN") return null;
 
   return (
-    <div className="flex min-h-screen">
-      <div className="hidden lg:flex flex-col h-screen sticky top-0 border-r border-[var(--border)]">
+    <div className="flex min-h-screen w-full justify-center bg-background text-foreground transition-colors duration-200">
+      <div className="hidden md:flex flex-col h-screen sticky top-0 border-r border-border w-[252px] flex-shrink-0">
         <DesktopSidebar />
       </div>
 
-      <main className="flex-1 max-w-[800px] mx-auto border-r border-[var(--border)] min-h-screen">
-        <div className="sticky top-0 z-20 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-md">
-          <h1 className="text-xl font-bold text-[var(--text)]">Admin Panel</h1>
+      <main className="w-full max-w-[800px] border-r border-border min-h-screen">
+        <div className="sticky top-0 z-20 px-4 py-3 border-b border-border bg-background/90 backdrop-blur-xl">
+          <h1 className="text-xl font-bold text-foreground">Admin Panel</h1>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-[var(--border)]">
+        <div className="flex border-b border-border">
           {(["stats", "users", "reports"] as AdminTab[]).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={cn(
                 "flex-1 py-3 text-sm font-medium capitalize border-b-2 transition-colors",
                 tab === t
-                  ? "border-[var(--accent)] text-[var(--text)]"
-                  : "border-transparent text-[var(--text2)] hover:text-[var(--text)]",
+                  ? "border-foreground text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
               )}>
               {t}
             </button>
@@ -105,9 +105,9 @@ export default function AdminPage() {
                 { label: "Total threads", value: stats.threadCount },
                 { label: "Pending reports", value: stats.reportCount },
               ].map((s) => (
-                <div key={s.label} className="p-4 rounded-xl bg-[var(--bg2)] text-center">
-                  <p className="text-3xl font-bold text-[var(--text)]">{s.value.toLocaleString()}</p>
-                  <p className="text-xs text-[var(--text2)] mt-1">{s.label}</p>
+                <div key={s.label} className="p-4 rounded-xl bg-secondary text-center">
+                  <p className="text-3xl font-bold text-foreground">{s.value.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
                 </div>
               ))}
             </div>
@@ -119,18 +119,18 @@ export default function AdminPage() {
                 <input value={search} onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && searchUsers()}
                   placeholder="Search users by name or handle…"
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--bg2)] text-sm text-[var(--text)] placeholder:text-[var(--text2)] outline-none border border-[var(--border)]" />
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-secondary text-sm text-foreground placeholder:text-muted-foreground outline-none border border-border" />
                 <button onClick={searchUsers}
-                  className="px-4 py-2.5 rounded-xl bg-[var(--accent)] text-[var(--accent-text)] text-sm font-semibold">
+                  className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity">
                   Search
                 </button>
               </div>
               {users.map((u) => (
-                <div key={u.id} className="flex items-center gap-3 py-3 border-b border-[var(--border)]">
+                <div key={u.id} className="flex items-center gap-3 py-3 border-b border-border">
                   <Avatar src={u.avatarUrl} alt={u.displayName} size={36} />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-[var(--text)]">{u.displayName}</p>
-                    <p className="text-xs text-[var(--text2)]">@{u.username} · {u.role}</p>
+                    <p className="text-sm font-medium text-foreground">{u.displayName}</p>
+                    <p className="text-xs text-muted-foreground">@{u.username} · {u.role}</p>
                   </div>
                   <button onClick={() => toggleSuspend(u)}
                     className={cn(
@@ -149,25 +149,25 @@ export default function AdminPage() {
           {tab === "reports" && (
             <div className="space-y-3">
               {reports.filter((r) => r.status === "PENDING").length === 0 && (
-                <p className="text-center text-[var(--text2)] text-sm py-8">No pending reports 🎉</p>
+                <p className="text-center text-muted-foreground text-sm py-8">No pending reports 🎉</p>
               )}
               {reports.filter((r) => r.status === "PENDING").map((r) => (
-                <div key={r.id} className="p-4 rounded-xl bg-[var(--bg2)] space-y-2">
+                <div key={r.id} className="p-4 rounded-xl bg-secondary space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text2)]">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {r.targetType} report
                     </span>
-                    <span className="text-xs text-[var(--text3)]">{new Date(r.createdAt).toLocaleDateString()}</span>
+                    <span className="text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleDateString()}</span>
                   </div>
-                  <p className="text-sm text-[var(--text)]"><strong>Reason:</strong> {r.reason}</p>
-                  <p className="text-xs text-[var(--text2)]">Reported by @{r.reporter.username}</p>
+                  <p className="text-sm text-foreground"><strong>Reason:</strong> {r.reason}</p>
+                  <p className="text-xs text-muted-foreground">Reported by @{r.reporter.username}</p>
                   <div className="flex gap-2">
                     <button onClick={() => resolveReport(r, "RESOLVED")}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-500 hover:bg-red-500/20">
                       Remove content
                     </button>
                     <button onClick={() => resolveReport(r, "DISMISSED")}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--bg3)] text-[var(--text2)] hover:bg-[var(--border)]">
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-foreground/10 text-muted-foreground hover:bg-foreground/15 transition-colors">
                       Dismiss
                     </button>
                   </div>

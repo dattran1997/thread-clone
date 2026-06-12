@@ -1,81 +1,95 @@
 @import "tailwindcss";
 
 /* ────────────────────────────────────────────
-   THEME TOKENS
-   Applied via data-theme attribute on <html>
-   Three themes: dark (default) · light · warm
+   Enable `dark:` Tailwind variant via .dark class
    ──────────────────────────────────────────── */
+@custom-variant dark (&:is(.dark *));
 
-:root,
-[data-theme="dark"] {
+/* ────────────────────────────────────────────
+   THEME TOKENS — Light (default)
+   ──────────────────────────────────────────── */
+:root {
+  --bg:           #ffffff;
+  --bg2:          #f0f2f5;
+  --bg3:          #e4e6eb;
+  --text:         #000000;
+  --text2:        #65676b;
+  --text3:        #8a8d91;
+  --border-color: rgba(0, 0, 0, 0.08);
+  --accent:       #000000;
+  --accent-text:  #ffffff;
+  --input-bg:     #f0f2f5;
+  --input-border: rgba(0, 0, 0, 0.15);
+  --link:         #65676b;
+  --skeleton:     linear-gradient(90deg, #e4e6eb 25%, #d0d2d5 50%, #e4e6eb 75%);
+  --toast-bg:     #000000;
+  --toast-fg:     #ffffff;
+  --bg-blur:      rgba(255, 255, 255, 0.85);
+  --hover-overlay: rgba(0, 0, 0, 0.05);
+  --destructive:  #d4183d;
+
+  /* Semantic aliases for Tailwind utility classes */
+  --background:            var(--bg);
+  --foreground:            var(--text);
+  --card:                  var(--bg);
+  --card-foreground:       var(--text);
+  --popover:               var(--bg2);
+  --popover-foreground:    var(--text);
+  --primary:               var(--accent);
+  --primary-foreground:    var(--accent-text);
+  --secondary:             var(--bg2);
+  --secondary-foreground:  var(--text);
+  --muted:                 var(--bg3);
+  --muted-foreground:      var(--text2);
+  --destructive-foreground: #ffffff;
+  --border:                var(--border-color);
+  --input:                 var(--input-bg);
+  --radius:                12px;
+}
+
+/* ────────────────────────────────────────────
+   Dark mode — via .dark class on <html>
+   ──────────────────────────────────────────── */
+.dark {
   --bg:           #101010;
   --bg2:          #1c1c1c;
   --bg3:          #282828;
   --text:         #f0f0f0;
   --text2:        #888888;
   --text3:        #555555;
-  --border:       rgba(255, 255, 255, 0.12);
-  --input-bg:     #1a1a1a;
-  --input-border: rgba(255, 255, 255, 0.15);
+  --border-color: rgba(255, 255, 255, 0.12);
   --accent:       #f0f0f0;
   --accent-text:  #101010;
+  --input-bg:     #1a1a1a;
+  --input-border: rgba(255, 255, 255, 0.15);
   --link:         #888;
   --skeleton:     linear-gradient(90deg, #222 25%, #2e2e2e 50%, #222 75%);
   --toast-bg:     #f0f0f0;
   --toast-fg:     #101010;
   --bg-blur:      rgba(16, 16, 16, 0.85);
-  --hover-overlay: rgba(255, 255, 255, 0.04);
+  --hover-overlay: rgba(255, 255, 255, 0.05);
   --destructive:  #ff3040;
 
-  /* shadcn-compatible aliases for Tailwind utility classes */
-  --background:         var(--bg);
-  --foreground:         var(--text);
-  --secondary:          var(--bg2);
-  --secondary-foreground: var(--text);
-  --muted:              var(--bg3);
-  --muted-foreground:   var(--text2);
-  --primary:            var(--accent);
-  --primary-foreground: var(--accent-text);
-  --card:               var(--bg);
-  --card-foreground:    var(--text);
-  --popover:            var(--bg2);
-  --popover-foreground: var(--text);
+  --background:            var(--bg);
+  --foreground:            var(--text);
+  --card:                  var(--bg);
+  --card-foreground:       var(--text);
+  --popover:               var(--bg2);
+  --popover-foreground:    var(--text);
+  --primary:               var(--accent);
+  --primary-foreground:    var(--accent-text);
+  --secondary:             var(--bg2);
+  --secondary-foreground:  var(--text);
+  --muted:                 var(--bg3);
+  --muted-foreground:      var(--text2);
+  --destructive-foreground: #ffffff;
+  --border:                var(--border-color);
+  --input:                 var(--input-bg);
 }
 
-[data-theme="light"] {
-  --bg:           #ffffff;
-  --bg2:          #f2f2f2;
-  --bg3:          #e6e6e6;
-  --text:         #0d0d0d;
-  --text2:        #737373;
-  --text3:        #b0b0b0;
-  --border:       rgba(0, 0, 0, 0.08);
-  --input-bg:     #f0f0f0;
-  --input-border: rgba(0, 0, 0, 0.15);
-  --accent:       #0d0d0d;
-  --accent-text:  #ffffff;
-  --link:         #737373;
-  --skeleton:     linear-gradient(90deg, #e6e6e6 25%, #d0d0d0 50%, #e6e6e6 75%);
-  --toast-bg:     #0d0d0d;
-  --toast-fg:     #ffffff;
-  --bg-blur:      rgba(255, 255, 255, 0.85);
-  --hover-overlay: rgba(0, 0, 0, 0.04);
-  --destructive:  #d4183d;
-
-  --background:         var(--bg);
-  --foreground:         var(--text);
-  --secondary:          var(--bg2);
-  --secondary-foreground: var(--text);
-  --muted:              var(--bg3);
-  --muted-foreground:   var(--text2);
-  --primary:            var(--accent);
-  --primary-foreground: var(--accent-text);
-  --card:               var(--bg);
-  --card-foreground:    var(--text);
-  --popover:            var(--bg2);
-  --popover-foreground: var(--text);
-}
-
+/* ────────────────────────────────────────────
+   Warm accent theme (data-theme="warm")
+   ──────────────────────────────────────────── */
 [data-theme="warm"] {
   --bg:           #fdf8f0;
   --bg2:          #f2ebe0;
@@ -83,11 +97,11 @@
   --text:         #1c1309;
   --text2:        #7a6a50;
   --text3:        #b0a080;
-  --border:       rgba(0, 0, 0, 0.08);
-  --input-bg:     #ede8de;
-  --input-border: rgba(0, 0, 0, 0.12);
+  --border-color: rgba(0, 0, 0, 0.08);
   --accent:       #c05a10;
   --accent-text:  #ffffff;
+  --input-bg:     #ede8de;
+  --input-border: rgba(0, 0, 0, 0.12);
   --link:         #c05a10;
   --skeleton:     linear-gradient(90deg, #e8ddd0 25%, #d8cdc0 50%, #e8ddd0 75%);
   --toast-bg:     #1c1309;
@@ -96,44 +110,57 @@
   --hover-overlay: rgba(0, 0, 0, 0.04);
   --destructive:  #d4183d;
 
-  --background:         var(--bg);
-  --foreground:         var(--text);
-  --secondary:          var(--bg2);
-  --secondary-foreground: var(--text);
-  --muted:              var(--bg3);
-  --muted-foreground:   var(--text2);
-  --primary:            var(--accent);
-  --primary-foreground: var(--accent-text);
-  --card:               var(--bg);
-  --card-foreground:    var(--text);
-  --popover:            var(--bg2);
-  --popover-foreground: var(--text);
+  --background:            var(--bg);
+  --foreground:            var(--text);
+  --card:                  var(--bg);
+  --card-foreground:       var(--text);
+  --popover:               var(--bg2);
+  --popover-foreground:    var(--text);
+  --primary:               var(--accent);
+  --primary-foreground:    var(--accent-text);
+  --secondary:             var(--bg2);
+  --secondary-foreground:  var(--text);
+  --muted:                 var(--bg3);
+  --muted-foreground:      var(--text2);
+  --border:                var(--border-color);
+  --input:                 var(--input-bg);
 }
 
 /* ────────────────────────────────────────────
-   TAILWIND v4 @theme inline — exposes CSS vars
-   as Tailwind utility classes: bg-background,
-   text-foreground, border-border, bg-secondary,
-   text-muted-foreground, bg-foreground/N, etc.
+   TAILWIND v4 @theme inline
+   Exposes all CSS vars as Tailwind utility classes:
+   bg-background, text-foreground, border-border,
+   bg-secondary, text-muted-foreground,
+   bg-foreground/5, hover:bg-foreground/5, etc.
    ──────────────────────────────────────────── */
 @theme inline {
-  --color-background:          var(--background);
-  --color-foreground:          var(--foreground);
-  --color-secondary:           var(--secondary);
-  --color-secondary-foreground:var(--secondary-foreground);
-  --color-muted:               var(--muted);
-  --color-muted-foreground:    var(--muted-foreground);
-  --color-primary:             var(--primary);
-  --color-primary-foreground:  var(--primary-foreground);
-  --color-card:                var(--card);
-  --color-card-foreground:     var(--card-foreground);
-  --color-popover:             var(--popover);
-  --color-popover-foreground:  var(--popover-foreground);
-  --color-border:              var(--border);
-  --color-input:               var(--input-bg);
-  --color-destructive:         var(--destructive);
-  --color-accent:              var(--accent);
-  --color-accent-foreground:   var(--accent-text);
+  --color-background:           var(--background);
+  --color-foreground:           var(--foreground);
+  --color-card:                 var(--card);
+  --color-card-foreground:      var(--card-foreground);
+  --color-popover:              var(--popover);
+  --color-popover-foreground:   var(--popover-foreground);
+  --color-primary:              var(--primary);
+  --color-primary-foreground:   var(--primary-foreground);
+  --color-secondary:            var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted:                var(--muted);
+  --color-muted-foreground:     var(--muted-foreground);
+  --color-destructive:          var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border:               var(--border);
+  --color-input:                var(--input);
+  --color-input-border:         var(--input-border);
+  --color-accent:               var(--accent);
+  --color-accent-foreground:    var(--accent-text);
+
+  /* Shorthand tokens for legacy var() usage */
+  --color-bg-1:   var(--bg);
+  --color-bg-2:   var(--bg2);
+  --color-bg-3:   var(--bg3);
+  --color-text-1: var(--text);
+  --color-text-2: var(--text2);
+  --color-text-3: var(--text3);
 
   --radius-sm: 8px;
   --radius-md: 10px;
@@ -142,38 +169,42 @@
 }
 
 /* ────────────────────────────────────────────
-   BASE STYLES
+   BASE STYLES  (matches Figma @layer base)
    ──────────────────────────────────────────── */
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    /* Figma: @apply border-border outline-none */
+    border-color: var(--border);
+    outline: none;
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    /* Figma: @apply bg-background text-foreground */
+    background-color:        var(--background);
+    color:                   var(--foreground);
+    font-family:             system-ui, -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing:  antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Smooth theme transitions */
+    transition:              background-color 0.2s ease, color 0.2s ease;
+  }
+
+  a        { color: inherit; text-decoration: none; }
+  button   { font-family: inherit; cursor: pointer; }
+  textarea,
+  input    { font-family: inherit; }
+  ::placeholder { color: var(--text3); }
+
+  ::-webkit-scrollbar { width: 0; height: 0; }
 }
-
-html,
-body {
-  height: 100%;
-}
-
-body {
-  background:              var(--bg);
-  color:                   var(--text);
-  font-family:             system-ui, -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing:  antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a            { color: inherit; text-decoration: none; }
-button       { font-family: inherit; cursor: pointer; }
-textarea,
-input        { font-family: inherit; }
-::placeholder { color: var(--text3); }
-
-/* Hide scrollbars but keep functionality */
-::-webkit-scrollbar { width: 0; height: 0; }
 
 /* ────────────────────────────────────────────
    KEYFRAME ANIMATIONS
@@ -207,7 +238,6 @@ input        { font-family: inherit; }
   60%       { transform: scale(0.9); }
 }
 
-/* Skeleton shimmer utility */
 .skeleton {
   background:      var(--skeleton);
   background-size: 200% 100%;

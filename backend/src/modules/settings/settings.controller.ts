@@ -66,4 +66,29 @@ export class SettingsController {
   removeHiddenWord(@CurrentUser() user: { id: string }, @Param("word") word: string) {
     return this.settingsService.removeHiddenWord(user.id, word);
   }
+
+  // ── Sessions (Login Activity) ──────────────────────────────────────────────
+
+  @Get("sessions")
+  @ApiOperation({ summary: "List active sessions" })
+  getSessions(@CurrentUser() user: { id: string }) {
+    return this.settingsService.getSessions(user.id);
+  }
+
+  @Delete("sessions/:sessionId")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Revoke a specific session" })
+  revokeSession(
+    @CurrentUser() user: { id: string },
+    @Param("sessionId") sessionId: string,
+  ) {
+    return this.settingsService.revokeSession(user.id, sessionId);
+  }
+
+  @Delete("sessions")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Sign out all other sessions" })
+  revokeAllOtherSessions(@CurrentUser() user: { id: string }) {
+    return this.settingsService.revokeAllOtherSessions(user.id);
+  }
 }

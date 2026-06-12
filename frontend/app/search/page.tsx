@@ -8,8 +8,8 @@ import { PostCard, Thread } from "@/components/thread/PostCard";
 import { DesktopSidebar } from "@/components/shell/DesktopSidebar";
 import { RightPanel } from "@/components/shell/RightPanel";
 import { MobileNav } from "@/components/shell/MobileNav";
-import { CloseIcon, SearchIcon } from "@/components/ui/Icons";
 import { fmtN, cn } from "@/lib/utils";
+import { Search, X } from "lucide-react";
 import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -25,19 +25,14 @@ type FilterPill = "All" | "People" | "Threads" | "Tags" | "Media";
 
 const PILLS: FilterPill[] = ["All", "People", "Threads", "Tags", "Media"];
 
-// map pill → API type param
 const PILL_TYPE: Record<FilterPill, string> = {
-  All: "users",
-  People: "users",
-  Threads: "threads",
-  Tags: "tags",
-  Media: "threads",
+  All: "users", People: "users", Threads: "threads", Tags: "tags", Media: "threads",
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function SearchPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen bg-[var(--bg)]" />}>
+    <Suspense fallback={<div className="flex min-h-screen w-full justify-center bg-background text-foreground transition-colors duration-200" />}>
       <SearchPageInner />
     </Suspense>
   );
@@ -55,7 +50,6 @@ function SearchPageInner() {
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load trending hashtags (shown when query is empty)
   useEffect(() => {
     api.get<TrendingTag[]>("/hashtags/trending?limit=10")
       .then(setTrendingTags)
@@ -83,7 +77,6 @@ function SearchPageInner() {
 
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
-      const type = PILL_TYPE[pill];
       try {
         if (pill === "All" || pill === "People") {
           const res = await api.get<{ data: UserResult[] }>(`/search?q=${encodeURIComponent(query)}&type=users`);
@@ -105,43 +98,39 @@ function SearchPageInner() {
   }, [query, pill]);
 
   const noResults =
-    !loading &&
-    query.trim() &&
-    userResults.length === 0 &&
-    threadResults.length === 0 &&
-    tagResults.length === 0;
+    !loading && query.trim() &&
+    userResults.length === 0 && threadResults.length === 0 && tagResults.length === 0;
 
   return (
-    <div className="flex min-h-screen">
-      {/* Desktop sidebar */}
-      <div className="hidden lg:flex flex-col h-screen sticky top-0 border-r border-[var(--border)]">
+    <div className="flex min-h-screen w-full justify-center bg-background text-foreground transition-colors duration-200">
+      <div className="hidden md:flex flex-col h-screen sticky top-0 border-r border-border w-[252px] flex-shrink-0">
         <DesktopSidebar />
       </div>
 
-      <main className="flex-1 max-w-[622px] w-full mx-auto border-r border-[var(--border)] min-h-screen pb-14 lg:pb-0">
-        {/* ── Sticky search bar + pills ── */}
-        <div className="sticky top-0 z-20 bg-[var(--bg-blur)] backdrop-blur-md border-b border-[var(--border)]">
+      <main className="w-full max-w-[622px] border-r border-border min-h-screen pb-14 md:pb-0">
+        {/* Sticky search bar + pills */}
+        <div className="sticky top-0 z-20 bg-background/90 backdrop-blur-xl border-b border-border">
           <div className="px-4 pt-3 pb-2">
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-[var(--bg2)]">
-              <SearchIcon size={18} className="text-[var(--text2)] shrink-0" />
+            <div className="flex items-center gap-2 px-3 py-3 rounded-xl bg-secondary">
+              <Search size={18} className="text-muted-foreground shrink-0" />
               <input
                 ref={inputRef}
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search"
-                className="flex-1 bg-transparent text-[16px] text-[var(--text)] placeholder:text-[var(--text2)] outline-none"
+                className="flex-1 bg-transparent text-[16px] text-foreground placeholder:text-muted-foreground outline-none"
               />
               {query && (
                 <button onClick={() => { setQuery(""); inputRef.current?.focus(); }}
-                  className="text-[var(--text2)] hover:text-[var(--text)] transition-colors">
-                  <CloseIcon size={16} />
+                  className="text-muted-foreground hover:text-foreground transition-colors">
+                  <X size={16} />
                 </button>
               )}
             </div>
           </div>
 
-          {/* Filter pills — always visible */}
+          {/* Filter pills */}
           <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-hide">
             {PILLS.map((p) => (
               <button
@@ -150,8 +139,8 @@ function SearchPageInner() {
                 className={cn(
                   "whitespace-nowrap rounded-full px-5 py-2 text-[14px] font-medium transition-colors shrink-0 border",
                   pill === p
-                    ? "bg-[var(--text)] border-[var(--text)] text-[var(--bg)]"
-                    : "border-[var(--border)] text-[var(--text)] hover:bg-[var(--hover-overlay)]",
+                    ? "bg-primary border-primary text-primary-foreground"
+                    : "border-border text-foreground hover:bg-foreground/5",
                 )}
               >
                 {p}
@@ -160,56 +149,54 @@ function SearchPageInner() {
           </div>
         </div>
 
-        {/* ── Content ── */}
+        {/* Content */}
         {!query.trim() ? (
-          /* Trending — shown when query is empty */
+          /* Trending */
           <div className="px-4 py-5">
-            <h2 className="text-[15px] font-semibold text-[var(--text)] mb-5">Trending</h2>
+            <h2 className="text-[15px] font-semibold text-foreground mb-5">Trending</h2>
             <div className="flex flex-col gap-5">
               {trendingTags.map((t, i) => (
                 <button
                   key={t.id}
                   onClick={() => setQuery(`#${t.tag}`)}
-                  className="w-full flex items-start gap-4 text-left group hover:bg-[var(--bg2)] px-2 py-2 rounded-xl transition-colors"
+                  className="w-full flex items-start gap-4 text-left group hover:bg-foreground/5 px-2 py-2 rounded-xl transition-colors"
                 >
-                  <span className="text-[15px] text-[var(--text2)] w-5 shrink-0 text-right">{i + 1}</span>
+                  <span className="text-[15px] text-muted-foreground w-5 shrink-0 text-right">{i + 1}</span>
                   <div className="flex flex-col">
-                    <p className="text-[12px] text-[var(--text2)]">Trending</p>
-                    <p className="text-[16px] font-semibold text-[var(--text)] group-hover:underline">
-                      #{t.tag}
-                    </p>
-                    <p className="text-[12px] text-[var(--text2)]">{fmtN(t.threadCount)} threads</p>
+                    <p className="text-[12px] text-muted-foreground">Trending</p>
+                    <p className="text-[16px] font-semibold text-foreground group-hover:underline">#{t.tag}</p>
+                    <p className="text-[12px] text-muted-foreground">{fmtN(t.threadCount)} threads</p>
                   </div>
                 </button>
               ))}
             </div>
           </div>
         ) : loading ? (
-          <div className="p-6 text-center text-[var(--text2)] text-sm">Searching…</div>
+          <div className="p-6 text-center text-muted-foreground text-sm">Searching…</div>
         ) : noResults ? (
           <div className="p-8 text-center">
-            <p className="text-[var(--text2)] text-[15px]">No results for &quot;{query}&quot;</p>
+            <p className="text-muted-foreground text-[15px]">No results for &quot;{query}&quot;</p>
           </div>
         ) : (
           <>
-            {/* People results */}
+            {/* People */}
             {(pill === "All" || pill === "People") && userResults.length > 0 && (
               <div>
                 {pill === "All" && (
-                  <p className="px-4 pt-4 pb-1 text-[13px] font-semibold text-[var(--text2)] uppercase tracking-wider">
+                  <p className="px-4 pt-4 pb-1 text-[13px] font-semibold text-muted-foreground uppercase tracking-wider">
                     People
                   </p>
                 )}
                 {userResults.map((u) => (
                   <Link key={u.id} href={`/${u.username}`}
-                    className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] hover:bg-[var(--bg2)] transition-colors">
+                    className="flex items-center justify-between px-4 py-3 border-b border-border hover:bg-foreground/5 transition-colors">
                     <div className="flex items-center gap-3">
                       <Avatar src={u.avatarUrl} alt={u.displayName} size={44} />
                       <div className="flex flex-col">
-                        <span className="text-[15px] font-semibold text-[var(--text)]">{u.displayName}</span>
-                        <span className="text-[13px] text-[var(--text2)]">@{u.username}</span>
+                        <span className="text-[15px] font-semibold text-foreground">{u.displayName}</span>
+                        <span className="text-[13px] text-muted-foreground">@{u.username}</span>
                         {u.followerCount !== undefined && (
-                          <span className="text-[13px] text-[var(--text)] mt-0.5">
+                          <span className="text-[13px] text-foreground mt-0.5">
                             {fmtN(u.followerCount)} followers
                           </span>
                         )}
@@ -217,7 +204,7 @@ function SearchPageInner() {
                     </div>
                     <button
                       onClick={(e) => e.preventDefault()}
-                      className="px-5 py-1.5 rounded-full border border-[var(--border)] text-[14px] font-medium text-[var(--text)] hover:bg-[var(--bg2)] transition-colors"
+                      className="px-5 py-1.5 rounded-full border border-border text-[14px] font-medium text-foreground hover:bg-foreground/5 transition-colors"
                     >
                       Follow
                     </button>
@@ -226,23 +213,23 @@ function SearchPageInner() {
               </div>
             )}
 
-            {/* Tag results */}
+            {/* Tags */}
             {pill === "Tags" && tagResults.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setQuery(`#${t.tag}`)}
-                className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)] hover:bg-[var(--bg2)] transition-colors text-left"
+                className="w-full flex items-center justify-between px-4 py-3 border-b border-border hover:bg-foreground/5 transition-colors text-left"
               >
-                <span className="text-[16px] font-semibold text-[var(--text)]">#{t.tag}</span>
-                <span className="text-[13px] text-[var(--text2)]">{fmtN(t.threadCount)} posts</span>
+                <span className="text-[16px] font-semibold text-foreground">#{t.tag}</span>
+                <span className="text-[13px] text-muted-foreground">{fmtN(t.threadCount)} posts</span>
               </button>
             ))}
 
-            {/* Thread / media results */}
+            {/* Threads */}
             {(pill === "All" || pill === "Threads" || pill === "Media") && threadResults.length > 0 && (
               <div>
                 {pill === "All" && userResults.length > 0 && (
-                  <p className="px-4 pt-4 pb-1 text-[13px] font-semibold text-[var(--text2)] uppercase tracking-wider">
+                  <p className="px-4 pt-4 pb-1 text-[13px] font-semibold text-muted-foreground uppercase tracking-wider">
                     Threads
                   </p>
                 )}
@@ -253,8 +240,8 @@ function SearchPageInner() {
         )}
       </main>
 
-      <div className="hidden xl:block"><RightPanel /></div>
-      <div className="lg:hidden"><MobileNav /></div>
+      <div className="hidden lg:flex w-[310px] flex-shrink-0"><RightPanel /></div>
+      <div className="md:hidden"><MobileNav /></div>
     </div>
   );
 }

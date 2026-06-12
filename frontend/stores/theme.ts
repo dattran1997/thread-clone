@@ -13,13 +13,27 @@ interface ThemeStore {
   setLayout: (l: Layout) => void;
 }
 
+function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+  // Remove all theme classes/attrs first
+  root.classList.remove("dark");
+  root.removeAttribute("data-theme");
+
+  if (theme === "dark") {
+    root.classList.add("dark");
+  } else if (theme === "warm") {
+    root.setAttribute("data-theme", "warm");
+  }
+  // light = no class / no data-theme (uses :root defaults)
+}
+
 export const useThemeStore = create<ThemeStore>()(
   persist(
     (set) => ({
       theme: "dark",
       layout: "auto",
       setTheme: (theme) => {
-        document.documentElement.setAttribute("data-theme", theme);
+        applyTheme(theme);
         set({ theme });
       },
       setLayout: (layout) => set({ layout }),
@@ -27,13 +41,3 @@ export const useThemeStore = create<ThemeStore>()(
     { name: "threads-theme" }
   )
 );
-
-/** Call once in root layout to apply persisted theme on mount */
-export function applyStoredTheme() {
-  const raw = localStorage.getItem("threads-theme");
-  if (!raw) return;
-  try {
-    const { state } = JSON.parse(raw) as { state: { theme: Theme } };
-    if (state?.theme) document.documentElement.setAttribute("data-theme", state.theme);
-  } catch {}
-}

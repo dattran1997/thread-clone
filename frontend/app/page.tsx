@@ -10,6 +10,7 @@ import { RightPanel } from "@/components/shell/RightPanel";
 import { MobileNav } from "@/components/shell/MobileNav";
 import { Logo } from "@/components/shell/Logo";
 import { cn } from "@/lib/utils";
+import { DEMO_THREADS } from "@/lib/demo-data";
 
 type FeedTab = "for-you" | "following";
 
@@ -49,6 +50,7 @@ export default function HomePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, isAuthenticated]);
 
+  // "See new posts" pill after 5s idle
   useEffect(() => {
     const startTimer = () => {
       if (pillTimerRef.current) clearTimeout(pillTimerRef.current);
@@ -64,6 +66,7 @@ export default function HomePage() {
     };
   }, [tab]);
 
+  // Infinite scroll
   useEffect(() => {
     observerRef.current?.disconnect();
     if (!bottomRef.current || !hasMore || loading) return;
@@ -78,72 +81,103 @@ export default function HomePage() {
   const handleDelete = (id: string) => setThreads((prev) => prev.filter((t) => t.id !== id));
 
   return (
-    <div className="flex min-h-screen">
-      <div className="hidden lg:flex flex-col h-screen sticky top-0 border-r border-[var(--border)]">
+    <div className="flex min-h-screen w-full justify-center bg-background text-foreground transition-colors duration-200">
+      {/* Desktop sidebar */}
+      <div className="hidden md:flex flex-col h-screen sticky top-0 border-r border-border w-[252px] flex-shrink-0">
         <DesktopSidebar />
       </div>
 
-      <main className="flex-1 max-w-[622px] w-full mx-auto border-r border-[var(--border)] min-h-screen pb-14 lg:pb-0">
-        <div className="lg:hidden sticky top-0 z-30 h-14 flex items-center justify-center border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-xl">
+      <main className="w-full max-w-[622px] border-r border-border min-h-screen pt-14 pb-14 md:pt-0 md:pb-0">
+        {/* Mobile logo bar */}
+        <div className="md:hidden fixed top-0 left-0 right-0 z-30 h-14 flex items-center justify-center border-b border-border bg-background/80 backdrop-blur-xl">
           <Logo size={28} />
         </div>
 
-        <div className="sticky top-14 lg:top-0 z-20 flex border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-xl">
+        {/* Tab bar */}
+        <div className="sticky top-14 md:top-0 z-20 flex border-b border-border bg-background/90 backdrop-blur-xl">
           {(["for-you", "following"] as FeedTab[]).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={cn(
                 "relative flex-1 py-4 text-[15px] font-medium transition-colors",
-                tab === t ? "text-[var(--text)]" : "text-[var(--text2)] hover:text-[var(--text)]",
+                tab === t ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}>
               {t === "for-you" ? "For you" : "Following"}
               {tab === t && (
-                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--text)] rounded-full" />
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground rounded-full" />
               )}
             </button>
           ))}
         </div>
 
+        {/* Composer */}
         {isAuthenticated && (
-          <div className="border-b border-[var(--border)]">
-            <Composer onSuccess={(t) => setThreads((prev) => [t, ...prev])} />
-          </div>
+          <Composer onSuccess={(t) => setThreads((prev) => [t, ...prev])} />
         )}
 
+        {/* New posts pill */}
         {showPill && (
           <div className="flex justify-center sticky top-24 z-20 pointer-events-none">
-            <button onClick={() => { setShowPill(false); window.scrollTo({ top: 0, behavior: "smooth" }); fetchFeed(true); }}
-              className="pointer-events-auto px-5 py-2 rounded-full bg-[var(--accent)] text-[var(--accent-text)] text-sm font-semibold shadow-lg animate-[slideUp_0.3s_ease]">
+            <button
+              onClick={() => { setShowPill(false); window.scrollTo({ top: 0, behavior: "smooth" }); fetchFeed(true); }}
+              className="pointer-events-auto px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold shadow-lg animate-[slideUp_0.3s_ease]"
+            >
               See new posts
             </button>
           </div>
         )}
 
+        {/* Content */}
         {loading && threads.length === 0 && isAuthenticated ? (
           [...Array(5)].map((_, i) => <PostCardSkeleton key={i} />)
         ) : !isAuthenticated ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center px-6 gap-5">
-            <Logo size={56} />
-            <div>
-              <h1 className="text-[26px] font-bold text-[var(--text)] mb-2">Welcome to Threads</h1>
-              <p className="text-[15px] text-[var(--text2)]">Sign in to see your feed and post threads.</p>
+          <>
+            {/* Welcome CTA strip */}
+            <div className="flex items-center justify-between gap-4 px-4 py-4 border-b border-border bg-secondary/40">
+              <div className="flex items-center gap-3">
+                <Logo size={28} />
+                <div>
+                  <p className="text-[14px] font-semibold text-foreground leading-tight">Join Threads</p>
+                  <p className="text-[12px] text-muted-foreground leading-tight">Follow people. See what&apos;s happening.</p>
+                </div>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <a href="/login"
+                  className="px-4 py-2 rounded-xl border border-border text-[13px] font-semibold text-foreground hover:bg-foreground/5 transition-colors">
+                  Log in
+                </a>
+                <a href="/register"
+                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-[13px] font-bold hover:opacity-90 transition-opacity border border-transparent">
+                  Sign up
+                </a>
+              </div>
             </div>
-            <div className="flex flex-col gap-2 w-full max-w-[320px] mt-2">
-              <a href="/login"
-                className="w-full py-4 rounded-xl bg-[var(--accent)] text-[var(--accent-text)] font-bold text-[15px] text-center hover:opacity-90 transition-opacity">
-                Log in
-              </a>
-              <a href="/register"
-                className="w-full py-4 rounded-xl border border-[var(--border)] text-[var(--text)] font-semibold text-[15px] text-center hover:bg-[var(--hover-overlay)] transition-colors">
-                Create account
-              </a>
+
+            {/* Demo posts — blurred at bottom to invite sign-up */}
+            <div className="relative">
+              {DEMO_THREADS.map((t) => (
+                <PostCard key={t.id} thread={t} />
+              ))}
+              {/* Fade-to-blur gate */}
+              <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+              <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center justify-end pb-8 gap-4 pointer-events-none">
+                <div className="pointer-events-auto flex flex-col items-center gap-3">
+                  <a href="/register"
+                    className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-[15px] hover:opacity-90 transition-opacity border border-transparent shadow-xl">
+                    Create account to see more
+                  </a>
+                  <a href="/login" className="text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+                    Already have an account? Log in
+                  </a>
+                </div>
+              </div>
             </div>
-          </div>
+          </>
         ) : threads.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center px-6">
-            <p className="text-lg font-semibold text-[var(--text)]">
+            <p className="text-lg font-semibold text-foreground">
               {tab === "following" ? "Follow more people" : "Nothing here yet"}
             </p>
-            <p className="text-sm text-[var(--text2)] mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               {tab === "following" ? "Follow people to see their threads here." : "Post your first thread!"}
             </p>
           </div>
@@ -152,7 +186,7 @@ export default function HomePage() {
             {threads.map((t) => <PostCard key={t.id} thread={t} onDelete={handleDelete} />)}
             <div ref={bottomRef} className="h-4" />
             {!hasMore && threads.length > 0 && (
-              <p className="text-center text-sm text-[var(--text2)] py-8">You&apos;re all caught up ✦</p>
+              <p className="text-center text-[14px] text-primary py-12">You&apos;re all caught up ✦</p>
             )}
             {loading && hasMore && (
               <div className="py-4">{[...Array(2)].map((_, i) => <PostCardSkeleton key={i} />)}</div>
@@ -161,8 +195,8 @@ export default function HomePage() {
         )}
       </main>
 
-      <div className="hidden xl:block"><RightPanel /></div>
-      <div className="lg:hidden"><MobileNav /></div>
+      <div className="hidden lg:flex flex-col w-[310px] flex-shrink-0"><RightPanel /></div>
+      <div className="md:hidden"><MobileNav /></div>
     </div>
   );
 }

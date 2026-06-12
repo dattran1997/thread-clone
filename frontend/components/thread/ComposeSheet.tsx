@@ -24,10 +24,10 @@ function CharRing({ count, max }: { count: number; max: number }) {
   const pct = Math.min((count / max) * 100, 100);
   const r = 10;
   const circ = 2 * Math.PI * r;
-  const color = pct >= 100 ? "var(--error, #ef4444)" : pct >= 80 ? "#f59e0b" : "var(--text)";
+  const color = pct >= 100 ? "var(--color-destructive, #ef4444)" : pct >= 80 ? "#f59e0b" : "var(--color-foreground)";
   return (
     <svg className="-rotate-90" width={24} height={24} viewBox="0 0 24 24">
-      <circle cx={12} cy={12} r={r} fill="none" stroke="var(--border)" strokeWidth={2} />
+      <circle cx={12} cy={12} r={r} fill="none" stroke="var(--color-border)" strokeWidth={2} />
       <circle
         cx={12} cy={12} r={r} fill="none"
         stroke={color} strokeWidth={2}
@@ -53,12 +53,12 @@ function WhoCanReplyView({
     { v: "MENTIONED", label: "Mentioned only", Icon: Lock },
   ];
   return (
-    <div className="w-full max-w-[600px] rounded-2xl overflow-hidden bg-[var(--bg2)] border border-[var(--border)] shadow-2xl">
-      <div className="flex items-center border-b border-[var(--border)] px-4 py-3">
-        <button onClick={onBack} className="mr-3 text-[var(--text2)] hover:text-[var(--text)] transition-colors">
+    <div className="w-full max-w-[600px] rounded-2xl overflow-hidden bg-secondary border border-border shadow-2xl">
+      <div className="flex items-center border-b border-border px-4 py-3">
+        <button onClick={onBack} className="mr-3 text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft size={20} />
         </button>
-        <span className="font-semibold text-[var(--text)] flex-1 text-center pr-8">Who can reply</span>
+        <span className="font-semibold text-foreground flex-1 text-center pr-8">Who can reply</span>
       </div>
       <div className="p-2">
         {options.map(({ v, label, Icon }) => (
@@ -66,16 +66,16 @@ function WhoCanReplyView({
             key={v}
             onClick={() => { onChange(v); onBack(); }}
             className={cn(
-              "w-full flex items-center justify-between p-4 rounded-xl transition-colors hover:bg-[var(--text)]/5",
-              value === v && "bg-[var(--text)]/5",
+              "w-full flex items-center justify-between p-4 rounded-xl transition-colors hover:bg-foreground/5",
+              value === v && "bg-foreground/5",
             )}
           >
             <div className="flex items-center gap-3">
-              <Icon size={22} className="text-[var(--text)]" />
-              <span className="text-[15px] font-medium text-[var(--text)]">{label}</span>
+              <Icon size={22} className="text-foreground" />
+              <span className="text-[15px] font-medium text-foreground">{label}</span>
             </div>
             {value === v && (
-              <div className="h-5 w-5 rounded-full border-4 border-[var(--accent)]" />
+              <div className="h-5 w-5 rounded-full border-4 border-primary" />
             )}
           </button>
         ))}
@@ -95,23 +95,23 @@ function ImageSubModal({ onClose }: { onClose: () => void }) {
     "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80",
   ];
   return (
-    <div className="mt-2 mb-3 rounded-xl border border-[var(--border)] bg-[var(--bg2)]/60 overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--border)]">
-        <span className="text-[13px] font-semibold text-[var(--text)]">Select Media</span>
-        <button onClick={onClose} className="text-[var(--text2)] hover:text-[var(--text)]">
+    <div className="mt-2 mb-3 rounded-xl border border-border bg-secondary/60 overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
+        <span className="text-[13px] font-semibold text-foreground">Select Media</span>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
           <X size={16} />
         </button>
       </div>
       <div className="grid grid-cols-3 gap-1.5 p-2">
         {placeholders.map((url, i) => (
           <button key={i} onClick={onClose}
-            className="aspect-square rounded-lg overflow-hidden border border-[var(--border)] hover:opacity-80 transition-opacity">
+            className="aspect-square rounded-lg overflow-hidden border border-border hover:opacity-80 transition-opacity">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={url} className="w-full h-full object-cover" alt={`media ${i + 1}`} />
           </button>
         ))}
       </div>
-      <p className="px-3 pb-2 text-[11px] text-[var(--text2)]">
+      <p className="px-3 pb-2 text-[11px] text-muted-foreground">
         Media upload coming soon · up to 20 files, 10MB/image, 5-min video
       </p>
     </div>
@@ -139,18 +139,18 @@ function HashSubModal({
   }, []);
 
   return (
-    <div className="mt-2 mb-3 rounded-xl border border-[var(--border)] bg-[var(--bg2)]/60 overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--border)]">
-        <span className="text-[13px] font-semibold text-[var(--text)]">Trending tags</span>
-        <button onClick={onClose} className="text-[var(--text2)] hover:text-[var(--text)]"><X size={16} /></button>
+    <div className="mt-2 mb-3 rounded-xl border border-border bg-secondary/60 overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
+        <span className="text-[13px] font-semibold text-foreground">Trending tags</span>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
       </div>
       <div className="flex flex-col max-h-[180px] overflow-y-auto">
         {tags.map((t) => (
           <button key={t.id}
             onClick={() => { onSelect(`#${t.tag}`); onClose(); }}
-            className="flex items-center justify-between px-4 py-3 text-left hover:bg-[var(--text)]/5 transition-colors border-b border-[var(--border)] last:border-0">
-            <span className="text-[14px] font-medium text-[var(--text)]">#{t.tag}</span>
-            <span className="text-[12px] text-[var(--text2)]">
+            className="flex items-center justify-between px-4 py-3 text-left hover:bg-foreground/5 transition-colors border-b border-border last:border-0">
+            <span className="text-[14px] font-medium text-foreground">#{t.tag}</span>
+            <span className="text-[12px] text-muted-foreground">
               {t.threadCount >= 1000 ? `${(t.threadCount / 1000).toFixed(1)}K` : t.threadCount} posts
             </span>
           </button>
@@ -167,24 +167,24 @@ function LocationSubModal({ onClose }: { onClose: () => void }) {
   const filtered = locations.filter((l) => l.toLowerCase().includes(query.toLowerCase()));
 
   return (
-    <div className="mt-2 mb-3 rounded-xl border border-[var(--border)] bg-[var(--bg2)]/60 overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--border)]">
-        <MapPin size={15} className="text-[var(--text2)] shrink-0" />
+    <div className="mt-2 mb-3 rounded-xl border border-border bg-secondary/60 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
+        <MapPin size={15} className="text-muted-foreground shrink-0" />
         <input
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search locations…"
-          className="flex-1 bg-transparent text-[14px] text-[var(--text)] outline-none placeholder:text-[var(--text2)]"
+          className="flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground"
         />
-        <button onClick={onClose} className="text-[var(--text2)] hover:text-[var(--text)]"><X size={16} /></button>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
       </div>
       <div className="flex flex-col max-h-[150px] overflow-y-auto">
         {filtered.map((loc) => (
           <button key={loc} onClick={onClose}
-            className="flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--text)]/5 transition-colors border-b border-[var(--border)] last:border-0">
-            <MapPin size={14} className="text-[var(--text2)] shrink-0" />
-            <span className="text-[14px] text-[var(--text)]">{loc}</span>
+            className="flex items-center gap-3 px-4 py-3 text-left hover:bg-foreground/5 transition-colors border-b border-border last:border-0">
+            <MapPin size={14} className="text-muted-foreground shrink-0" />
+            <span className="text-[14px] text-foreground">{loc}</span>
           </button>
         ))}
       </div>
@@ -214,22 +214,22 @@ function MicSubModal({ onClose }: { onClose: () => void }) {
   const ss = String(seconds % 60).padStart(2, "0");
 
   return (
-    <div className="mt-2 mb-3 flex flex-col items-center gap-4 py-6 rounded-xl border border-[var(--border)] bg-[var(--bg2)]/60">
+    <div className="mt-2 mb-3 flex flex-col items-center gap-4 py-6 rounded-xl border border-border bg-secondary/60">
       <button
         onClick={toggle}
         className={cn(
           "h-16 w-16 rounded-full flex items-center justify-center transition-all",
           recording
             ? "bg-red-500 text-white animate-pulse"
-            : "bg-[var(--accent)] text-[var(--accent-text, #000)]",
+            : "bg-primary text-primary-foreground",
         )}
       >
         {recording ? <Square size={24} fill="currentColor" /> : <Mic size={28} />}
       </button>
-      <span className="font-mono text-[16px] text-[var(--text)]">{mm}:{ss}</span>
-      <span className="text-[13px] text-[var(--text2)]">{recording ? "Tap to stop" : "Tap to record"}</span>
+      <span className="font-mono text-[16px] text-foreground">{mm}:{ss}</span>
+      <span className="text-[13px] text-muted-foreground">{recording ? "Tap to stop" : "Tap to record"}</span>
       {!recording && (
-        <button onClick={onClose} className="text-[13px] text-[var(--text2)] hover:text-[var(--text)]">Cancel</button>
+        <button onClick={onClose} className="text-[13px] text-muted-foreground hover:text-foreground">Cancel</button>
       )}
     </div>
   );
@@ -339,16 +339,16 @@ export function ComposeSheet() {
           onBack={() => setView("compose")}
         />
       ) : (
-        <div className="w-full max-w-[600px] rounded-2xl overflow-hidden bg-[var(--bg2)] border border-[var(--border)] shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="w-full max-w-[600px] rounded-2xl overflow-hidden bg-secondary border border-border shadow-2xl flex flex-col max-h-[90vh]">
           {/* ── Header ── */}
-          <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3 shrink-0">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3 shrink-0">
             <button
               onClick={close}
-              className="text-[var(--text2)] hover:text-[var(--text)] text-[15px] transition-colors"
+              className="text-muted-foreground hover:text-foreground text-[15px] transition-colors"
             >
               Cancel
             </button>
-            <span className="font-semibold text-[var(--text)] text-[15px]">
+            <span className="font-semibold text-foreground text-[15px]">
               {parentId ? "Reply" : "New thread"}
             </span>
             <button
@@ -357,8 +357,8 @@ export function ComposeSheet() {
               className={cn(
                 "px-5 py-1.5 rounded-full text-[14px] font-semibold transition-all",
                 canPost && !submitting
-                  ? "bg-[var(--accent)] text-[var(--accent-text,#000)] hover:opacity-90"
-                  : "bg-[var(--accent)]/40 text-[var(--accent-text,#000)]/60 cursor-not-allowed",
+                  ? "bg-primary text-primary-foreground hover:opacity-90"
+                  : "bg-primary/40 text-primary-foreground/60 cursor-not-allowed",
               )}
             >
               {submitting ? "Posting…" : "Post"}
@@ -371,12 +371,12 @@ export function ComposeSheet() {
               {/* Left column: avatar + thread line */}
               <div className="flex flex-col items-center gap-2 shrink-0">
                 <Avatar src={user?.avatarUrl} alt={user?.displayName ?? "You"} size={40} />
-                <div className="w-[2px] grow rounded-full bg-[var(--border)] min-h-[24px]" />
+                <div className="w-[2px] grow rounded-full bg-border min-h-[24px]" />
               </div>
 
               {/* Right column: username + textarea + sub-modals */}
               <div className="flex flex-col flex-1 min-w-0 pb-4">
-                <span className="font-semibold text-[var(--text)] text-[15px] mb-1.5">
+                <span className="font-semibold text-foreground text-[15px] mb-1.5">
                   {user?.username ?? "you"}
                 </span>
 
@@ -394,7 +394,7 @@ export function ComposeSheet() {
                       }}
                       placeholder="What's new?"
                       rows={3}
-                      className="w-full resize-none bg-transparent text-[15px] text-[var(--text)] placeholder:text-[var(--text2)] outline-none leading-relaxed overflow-hidden"
+                      className="w-full resize-none bg-transparent text-[15px] text-foreground placeholder:text-muted-foreground outline-none leading-relaxed overflow-hidden"
                       style={{ minHeight: "60px" }}
                     />
 
@@ -409,32 +409,32 @@ export function ComposeSheet() {
                     {subModal === "location" && <LocationSubModal onClose={() => setSubModal(null)} />}
 
                     {/* Attachment toolbar */}
-                    <div className="flex gap-4 mt-2 text-[var(--text2)]">
+                    <div className="flex gap-4 mt-2 text-muted-foreground">
                       <button
                         onClick={() => setSubModal(subModal === "image" ? null : "image")}
                         title="Attach media"
-                        className={cn("hover:text-[var(--text)] transition-colors", subModal === "image" && "text-[var(--accent)]")}
+                        className={cn("hover:text-foreground transition-colors", subModal === "image" && "text-primary")}
                       >
                         <ImageIcon size={20} />
                       </button>
                       <button
                         onClick={() => setSubModal("mic")}
                         title="Voice note"
-                        className="hover:text-[var(--text)] transition-colors"
+                        className="hover:text-foreground transition-colors"
                       >
                         <Mic size={20} />
                       </button>
                       <button
                         onClick={() => setSubModal(subModal === "hash" ? null : "hash")}
                         title="Trending hashtags"
-                        className={cn("hover:text-[var(--text)] transition-colors", subModal === "hash" && "text-[var(--accent)]")}
+                        className={cn("hover:text-foreground transition-colors", subModal === "hash" && "text-primary")}
                       >
                         <Hash size={20} />
                       </button>
                       <button
                         onClick={() => setSubModal(subModal === "location" ? null : "location")}
                         title="Add location"
-                        className={cn("hover:text-[var(--text)] transition-colors", subModal === "location" && "text-[var(--accent)]")}
+                        className={cn("hover:text-foreground transition-colors", subModal === "location" && "text-primary")}
                       >
                         <MapPin size={20} />
                       </button>
@@ -447,17 +447,17 @@ export function ComposeSheet() {
             {/* Add to thread row */}
             <div className="flex items-center gap-3 px-5 pb-4 opacity-50">
               <Avatar src={user?.avatarUrl} alt="" size={24} />
-              <span className="text-[14px] text-[var(--text2)]">Add to thread</span>
-              <Plus size={14} className="text-[var(--text2)]" />
+              <span className="text-[14px] text-muted-foreground">Add to thread</span>
+              <Plus size={14} className="text-muted-foreground" />
             </div>
           </div>
 
           {/* ── Footer ── */}
-          <div className="flex items-center justify-between px-5 py-4 border-t border-[var(--border)] shrink-0">
+          <div className="flex items-center justify-between px-5 py-4 border-t border-border shrink-0">
             {/* Who can reply */}
             <button
               onClick={() => setView("who-can-reply")}
-              className="flex items-center gap-1.5 text-[13px] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+              className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
             >
               <ReplyIcon size={15} />
               {replyLabel}
@@ -475,8 +475,8 @@ export function ComposeSheet() {
                 className={cn(
                   "px-5 py-1.5 rounded-full text-[14px] font-semibold transition-all",
                   canPost && !submitting
-                    ? "bg-[var(--accent)] text-[var(--accent-text,#000)] hover:opacity-90"
-                    : "bg-[var(--accent)]/40 text-[var(--accent-text,#000)]/60 cursor-not-allowed",
+                    ? "bg-primary text-primary-foreground hover:opacity-90"
+                    : "bg-primary/40 text-primary-foreground/60 cursor-not-allowed",
                 )}
               >
                 {submitting ? "Posting…" : "Post"}

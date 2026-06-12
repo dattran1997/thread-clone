@@ -42,38 +42,38 @@ export default function CommunitiesPage() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <div className="hidden lg:flex flex-col h-screen sticky top-0 border-r border-[var(--border)]">
+    <div className="flex min-h-screen w-full justify-center bg-background text-foreground transition-colors duration-200">
+      <div className="hidden md:flex flex-col h-screen sticky top-0 border-r border-border w-[252px] flex-shrink-0">
         <DesktopSidebar />
       </div>
 
-      <main className="flex-1 max-w-[622px] mx-auto border-r border-[var(--border)] min-h-screen pb-14 lg:pb-0">
-        <div className="sticky top-0 z-20 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-blur)] backdrop-blur-md">
-          <h1 className="text-xl font-bold text-[var(--text)]">Communities</h1>
+      <main className="w-full max-w-[622px] border-r border-border min-h-screen pb-14 md:pb-0">
+        <div className="sticky top-0 z-20 px-4 py-3 border-b border-border bg-background/90 backdrop-blur-xl">
+          <h1 className="text-xl font-bold text-foreground">Communities</h1>
         </div>
 
         {loading ? (
-          <div className="p-6 text-center text-[var(--text2)] text-sm">Loading communities…</div>
+          <div className="p-6 text-center text-muted-foreground text-sm">Loading communities…</div>
         ) : communities.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-[var(--text2)] text-sm">No communities yet. Create the first one!</p>
+            <p className="text-muted-foreground text-sm">No communities yet. Create the first one!</p>
           </div>
         ) : (
-          <div className="divide-y divide-[var(--border)]">
+          <div className="divide-y divide-border">
             {communities.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 px-4 py-4">
+              <div key={c.id} className="flex items-center gap-3 px-4 py-4 hover:bg-foreground/5 transition-colors">
                 <Avatar src={c.avatarUrl} alt={c.name} size={48} />
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-[var(--text)] text-sm">{c.name}</p>
-                  {c.description && <p className="text-xs text-[var(--text2)] truncate">{c.description}</p>}
-                  <p className="text-xs text-[var(--text3)] mt-0.5">{c.memberCount.toLocaleString()} members</p>
+                  <p className="font-semibold text-foreground text-sm">{c.name}</p>
+                  {c.description && <p className="text-xs text-muted-foreground truncate">{c.description}</p>}
+                  <p className="text-xs text-muted-foreground mt-0.5">{c.memberCount.toLocaleString()} members</p>
                 </div>
                 <button onClick={() => toggleJoin(c)}
                   className={cn(
                     "px-4 py-1.5 rounded-full text-xs font-semibold transition-colors flex-shrink-0",
                     c.isMember
-                      ? "border border-[var(--border)] text-[var(--text2)] hover:bg-[var(--bg2)]"
-                      : "bg-[var(--accent)] text-[var(--accent-text)] hover:opacity-90",
+                      ? "border border-border text-foreground hover:bg-foreground/5"
+                      : "bg-primary text-primary-foreground hover:opacity-90",
                   )}>
                   {c.isMember ? "Joined" : "Join"}
                 </button>
@@ -83,7 +83,7 @@ export default function CommunitiesPage() {
         )}
       </main>
 
-      <div className="lg:hidden"><MobileNav /></div>
+      <div className="md:hidden"><MobileNav /></div>
     </div>
   );
 }

@@ -19,7 +19,7 @@ export function Avatar({ src, alt, size = 36, className }: AvatarProps) {
     <div
       className={cn(
         "rounded-full overflow-hidden flex items-center justify-center flex-shrink-0",
-        "bg-[var(--bg3)] text-[var(--text2)] font-semibold select-none",
+        "bg-secondary text-muted-foreground font-semibold select-none",
         className,
       )}
       style={{ width: size, height: size, fontSize: size * 0.38 }}

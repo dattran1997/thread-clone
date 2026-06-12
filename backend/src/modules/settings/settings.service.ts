@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   UnauthorizedException,
+  BadRequestException,
   ConflictException,
 } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
@@ -50,7 +51,7 @@ export class SettingsService {
     if (!user) throw new NotFoundException("User not found");
 
     const valid = await bcrypt.compare(dto.currentPassword, user.passwordHash);
-    if (!valid) throw new UnauthorizedException("Current password is incorrect");
+    if (!valid) throw new BadRequestException("Current password is incorrect");
 
     const newHash = await bcrypt.hash(dto.newPassword, 12);
     await this.prisma.user.update({
@@ -93,6 +94,34 @@ export class SettingsService {
     return { words: updated.hiddenWords };
   }
 
+  // ── Sessions (Login Activity) ──────────────────────────────────────────────
+  async getSessions(userId: string) {
+    const sessions = await this.prisma.session.findMany({
+      where: { userId, expiresAt: { gt: new Date() } },
+      select: { id: true, createdAt: true, expiresAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+    return { sessions };
+  }
+
+  async revokeSession(userId: string, sessionId: string) {
+    // Only allow revoking own sessions
+    await this.prisma.session.deleteMany({
+      where: { id: sessionId, userId },
+    });
+    return { success: true };
+  }
+
+  async revokeAllOtherSessions(userId: string, currentSessionId?: string) {
+    await this.prisma.session.deleteMany({
+      where: {
+        userId,
+        ...(currentSessionId ? { id: { not: currentSessionId } } : {}),
+      },
+    });
+    return { success: true };
+  }
+
   async changeEmail(userId: string, dto: ChangeEmailDto) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -101,7 +130,7 @@ export class SettingsService {
     if (!user) throw new NotFoundException("User not found");
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) throw new UnauthorizedException("Password is incorrect");
+    if (!valid) throw new BadRequestException("Password is incorrect");
 
     const emailTaken = await this.prisma.user.findUnique({
       where: { email: dto.email },

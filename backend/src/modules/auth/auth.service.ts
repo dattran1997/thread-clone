@@ -113,6 +113,101 @@ export class AuthService {
     return { message: "If this email exists and is unverified, a new link has been sent" };
   }
 
+  // ── Forgot Password ────────────────────────────────────────────────────────
+  async forgotPassword(email: string) {
+    // Always return OK to prevent email enumeration
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) return { message: "If this email exists, a reset link has been sent" };
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordResetToken: resetToken, passwordResetExpires: resetExpires },
+    });
+
+    this.sendPasswordResetEmail(user.email, resetToken).catch(console.error);
+    return { message: "If this email exists, a reset link has been sent" };
+  }
+
+  // ── Reset Password ─────────────────────────────────────────────────────────
+  async resetPassword(token: string, newPassword: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpires: { gt: new Date() },
+      },
+    });
+    if (!user) throw new BadRequestException("Invalid or expired reset link");
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+    });
+
+    // Invalidate all sessions so old passwords can't be reused
+    await this.prisma.session.deleteMany({ where: { userId: user.id } });
+    return { message: "Password reset successfully" };
+  }
+
+  // ── Password reset email ───────────────────────────────────────────────────
+  private async sendPasswordResetEmail(email: string, token: string) {
+    const frontendUrl = this.config.get<string>("FRONTEND_URL") ?? "http://localhost:3000";
+    const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
+
+    if (this.config.get<string>("NODE_ENV") !== "production") {
+      console.log("\n╔══════════════════════════════════════════════════════════╗");
+      console.log("║  [DEV] PASSWORD RESET                                   ║");
+      console.log("╠══════════════════════════════════════════════════════════╣");
+      console.log(`║  To: ${email.padEnd(52)}║`);
+      console.log("║  Open this URL to reset your password:                  ║");
+      console.log(`║  ${resetUrl.slice(0, 56).padEnd(56)}║`);
+      if (resetUrl.length > 56) {
+        console.log(`║  ${resetUrl.slice(56, 112).padEnd(56)}║`);
+      }
+      console.log("╚══════════════════════════════════════════════════════════╝\n");
+      return;
+    }
+
+    const smtpUser = this.config.get<string>("SMTP_USER");
+    if (!smtpUser) return;
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const nodemailer = require("nodemailer");
+      const transporter = nodemailer.createTransport({
+        host: this.config.get<string>("SMTP_HOST"),
+        port: Number(this.config.get<string>("SMTP_PORT") ?? "587"),
+        auth: { user: smtpUser, pass: this.config.get<string>("SMTP_PASS") },
+      });
+      await transporter.sendMail({
+        from: this.config.get<string>("EMAIL_FROM") ?? "noreply@threads-clone.local",
+        to: email,
+        subject: "Reset your password — Threads",
+        html: `
+          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2>Reset your password</h2>
+            <p>Click the button below to set a new password. This link expires in 1 hour.</p>
+            <a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background:#000;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">
+              Reset password
+            </a>
+            <p style="color:#666;font-size:13px;margin-top:24px;">
+              If you didn't request this, ignore this email — your password won't change.
+            </p>
+          </div>
+        `,
+      });
+    } catch (err) {
+      console.error("[AUTH] Failed to send reset email:", err);
+    }
+  }
+
   // ── OAuth: find or create user from Google profile ────────────────────────
   async findOrCreateOAuthUser(profile: {
     googleId: string;
