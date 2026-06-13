@@ -205,18 +205,22 @@ export class MessagesService {
     return { success: true };
   }
 
-  // ── Delete a single message (sender only) ─────────────────────────────────
+  // ── Soft-delete (unsend) a message — sender only ──────────────────────────
   async deleteMessage(messageId: string, userId: string) {
     const message = await this.prisma.dmMessage.findUnique({
       where: { id: messageId },
-      select: { id: true, senderId: true, conversationId: true },
+      select: { id: true, senderId: true, conversationId: true, isDeleted: true },
     });
     if (!message) throw new NotFoundException("Message not found");
     if (message.senderId !== userId) {
-      throw new ForbiddenException("You can only delete your own messages");
+      throw new ForbiddenException("You can only unsend your own messages");
     }
+    if (message.isDeleted) return { conversationId: message.conversationId, messageId, success: true };
 
-    await this.prisma.dmMessage.delete({ where: { id: messageId } });
+    await this.prisma.dmMessage.update({
+      where: { id: messageId },
+      data: { isDeleted: true, deletedAt: new Date() },
+    });
     return { conversationId: message.conversationId, messageId, success: true };
   }
 }

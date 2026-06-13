@@ -387,6 +387,8 @@ model DmMessage {
   conversation   DmConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User           @relation(fields: [senderId],       references: [id])
   text           String
+  isDeleted      Boolean        @default(false)
+  deletedAt      DateTime?
   createdAt      DateTime       @default(now())
 
   @@index([conversationId, createdAt(sort: Desc)])
