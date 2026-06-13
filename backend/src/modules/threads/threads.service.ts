@@ -37,7 +37,7 @@ const BASE_SELECT = {
   },
   media: {
     orderBy: { order: "asc" as const },
-    select: { id: true, url: true, type: true, altText: true, order: true, width: true, height: true },
+    select: { id: true, url: true, hlsUrl: true, type: true, altText: true, order: true, width: true, height: true, duration: true, status: true },
   },
   hashtags: {
     select: {

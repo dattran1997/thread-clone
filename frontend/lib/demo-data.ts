@@ -40,7 +40,8 @@ export const DEMO_THREADS: Thread[] = [
     media: [
       {
         id: "m1", url: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=600&q=80",
-        type: "IMAGE" as const, altText: "MacBook keyboard closeup", order: 0,
+        hlsUrl: null, type: "IMAGE" as const, altText: "MacBook keyboard closeup", order: 0,
+        duration: null, status: "READY" as const,
       },
     ],
     poll: null, hashtags: [], topics: [],

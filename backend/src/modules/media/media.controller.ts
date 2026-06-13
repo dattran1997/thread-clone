@@ -1,6 +1,8 @@
 import {
   Controller,
+  Get,
   Post,
+  Param,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
@@ -11,9 +13,9 @@ import { memoryStorage } from "multer";
 import { MediaService } from "./media.service";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 
-const IMAGE_MAX_SIZE = 10 * 1024 * 1024;  // 10 MB
-const AUDIO_MAX_SIZE = 50 * 1024 * 1024;  // 50 MB
-const VIDEO_MAX_SIZE = 500 * 1024 * 1024; // 500 MB
+const IMAGE_MAX_SIZE = 10  * 1024 * 1024;  // 10 MB
+const AUDIO_MAX_SIZE = 50  * 1024 * 1024;  // 50 MB
+const VIDEO_MAX_SIZE = 500 * 1024 * 1024;  // 500 MB
 
 @ApiTags("media")
 @ApiBearerAuth()
@@ -21,8 +23,9 @@ const VIDEO_MAX_SIZE = 500 * 1024 * 1024; // 500 MB
 export class MediaController {
   constructor(private mediaService: MediaService) {}
 
+  // ── Upload ──────────────────────────────────────────────────────────────────
   @Post("upload")
-  @ApiOperation({ summary: "Upload a media file" })
+  @ApiOperation({ summary: "Upload a media file (images/audio direct; large videos → HLS)" })
   @ApiConsumes("multipart/form-data")
   @UseInterceptors(
     FileInterceptor("file", {
@@ -60,5 +63,12 @@ export class MediaController {
     }
 
     return this.mediaService.upload(file, user.id);
+  }
+
+  // ── Status polling ──────────────────────────────────────────────────────────
+  @Get(":id/status")
+  @ApiOperation({ summary: "Poll processing status for a media item" })
+  async getStatus(@Param("id") id: string) {
+    return this.mediaService.getStatus(id);
   }
 }

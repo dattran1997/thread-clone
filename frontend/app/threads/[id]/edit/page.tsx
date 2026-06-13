@@ -68,8 +68,8 @@ export default function EditThreadPage() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await api.upload<{ id: string; url: string; type: string }>("/media/upload", form);
-      const newMedia: Media = { id: res.id, url: res.url, type: res.type as Media["type"], altText: null };
+      const res = await api.upload<{ id: string; url: string | null; type: string; status: string; hlsUrl: string | null; duration: number | null }>("/media/upload", form);
+      const newMedia: Media = { id: res.id, url: res.url, hlsUrl: res.hlsUrl, type: res.type as Media["type"], altText: null, order: 0, duration: res.duration, status: (res.status as Media["status"]) ?? "READY" };
       setMedia((prev) => [...prev, newMedia]);
     } catch { toast("Upload failed", "error"); }
     finally { setUploading(false); }
@@ -199,8 +199,8 @@ export default function EditThreadPage() {
                 {visuals.map((m) => (
                   <div key={m.id} className="relative w-full aspect-[4/3] rounded-xl overflow-hidden border border-border bg-muted">
                     {m.type === "IMAGE"
-                      ? <img src={m.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                      : <video src={m.url} className="absolute inset-0 w-full h-full object-cover" />}
+                      ? <img src={m.url ?? undefined} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                      : <video src={m.url ?? undefined} className="absolute inset-0 w-full h-full object-cover" />}
                     <button
                       onClick={() => removeMedia(m.id)}
                       className="absolute top-1.5 right-1.5 bg-black/60 rounded-full p-1 text-white hover:bg-black/80 transition-colors"
@@ -216,7 +216,7 @@ export default function EditThreadPage() {
             {audio.map((m) => (
               <div key={m.id} className="flex items-center gap-3 bg-secondary rounded-xl px-4 py-3 border border-border">
                 <Mic size={16} className="text-muted-foreground shrink-0" />
-                <audio src={m.url} controls className="flex-1 h-8" />
+                <audio src={m.url ?? undefined} controls className="flex-1 h-8" />
                 <button onClick={() => removeMedia(m.id)} className="text-muted-foreground hover:text-destructive transition-colors">
                   <X size={16} />
                 </button>

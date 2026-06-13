@@ -11,6 +11,7 @@ import { cn, fmtN, relativeTime } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { toast } from "@/components/ui/Toast";
 import { Avatar } from "@/components/ui/Avatar";
+import { VideoPlayer } from "@/components/ui/VideoPlayer";
 import { useAuthStore } from "@/stores/auth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -26,9 +27,12 @@ interface Poll {
   id: string; options: PollOption[]; totalVotes: number;
   expiresAt: string; userVoteOptionId: string | null;
 }
-interface Media {
-  id: string; url: string; type: "IMAGE" | "VIDEO" | "AUDIO";
+export type MediaStatus = "READY" | "PROCESSING" | "FAILED";
+export interface Media {
+  id: string; url: string | null; hlsUrl: string | null;
+  type: "IMAGE" | "VIDEO" | "AUDIO";
   altText: string | null; order: number;
+  duration: number | null; status: MediaStatus;
 }
 
 export interface Thread {
@@ -609,7 +613,7 @@ export function PostCard({ thread, onDelete, onUnsave, showReplyLine = false }: 
             {/* Audio media */}
             {thread.media.filter((m) => m.type === "AUDIO").map((m) => (
               <div key={m.id} className="mt-2 flex items-center gap-2 rounded-xl bg-secondary border border-border px-3 py-2">
-                <audio src={m.url} controls className="h-8 w-full" style={{ colorScheme: "dark" }} />
+                <audio src={m.url ?? undefined} controls className="h-8 w-full" style={{ colorScheme: "dark" }} />
               </div>
             ))}
 
@@ -626,7 +630,7 @@ export function PostCard({ thread, onDelete, onUnsave, showReplyLine = false }: 
                       {m.type === "IMAGE" ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={m.url}
+                          src={m.url ?? undefined}
                           alt={m.altText ?? ""}
                           className="absolute inset-0 w-full h-full object-cover"
                           onError={(e) => {
@@ -643,7 +647,14 @@ export function PostCard({ thread, onDelete, onUnsave, showReplyLine = false }: 
                           }}
                         />
                       ) : (
-                        <video src={m.url} className="absolute inset-0 w-full h-full object-cover" controls />
+                        <VideoPlayer
+                          mediaId={m.id}
+                          url={m.url}
+                          hlsUrl={m.hlsUrl}
+                          status={m.status}
+                          duration={m.duration}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
                       )}
                     </div>
                   ))}

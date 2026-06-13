@@ -23,6 +23,7 @@ interface MediaItem {
   previewUrl: string;
   serverId?: string;
   uploading: boolean;
+  processing?: boolean;
   error?: string;
 }
 interface TrendingHashtag { id: string; tag: string; threadCount: number; }
@@ -190,15 +191,43 @@ export function ComposeSheet() {
     const form = new FormData();
     form.append("file", item.file);
     try {
-      const data = await api.upload<{ id: string; url: string; type: string }>("/media/upload", form);
-      setMediaItems((prev) =>
-        prev.map((m) => m.localId === item.localId ? { ...m, serverId: data.id, uploading: false } : m),
+      const data = await api.upload<{ id: string; url: string | null; type: string; status: string }>(
+        "/media/upload", form,
       );
+      const isProcessing = data.status === "PROCESSING";
+      setMediaItems((prev) =>
+        prev.map((m) => m.localId === item.localId
+          ? { ...m, serverId: data.id, uploading: false, processing: isProcessing }
+          : m),
+      );
+      if (isProcessing) {
+        pollMediaStatus(item.localId, data.id);
+      }
     } catch {
       setMediaItems((prev) =>
         prev.map((m) => m.localId === item.localId ? { ...m, uploading: false, error: "Upload failed" } : m),
       );
     }
+  }
+
+  function pollMediaStatus(localId: string, mediaId: string) {
+    const interval = setInterval(async () => {
+      try {
+        const data = await api.get<{ id: string; status: string }>(`/media/${mediaId}/status`);
+        if (data.status !== "PROCESSING") {
+          setMediaItems((prev) =>
+            prev.map((m) => m.localId === localId ? { ...m, processing: false } : m),
+          );
+          clearInterval(interval);
+        }
+      } catch { /* keep polling */ }
+    }, 3000);
+    setTimeout(() => {
+      clearInterval(interval);
+      setMediaItems((prev) =>
+        prev.map((m) => m.localId === localId && m.processing ? { ...m, processing: false } : m),
+      );
+    }, 10 * 60 * 1000);
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -278,9 +307,11 @@ export function ComposeSheet() {
   async function handlePost() {
     const overLimit   = text.length > MAX;
     const hasContent  = !!text.trim() || showPoll || mediaItems.length > 0;
-    const anyUploading = mediaItems.some((m) => m.uploading);
+    const anyUploading  = mediaItems.some((m) => m.uploading);
+    const anyProcessing = mediaItems.some((m) => m.processing);
     if (overLimit || !hasContent || loading) return;
-    if (anyUploading) { toast("Please wait for uploads to finish", "error"); return; }
+    if (anyUploading)  { toast("Please wait for uploads to finish", "error"); return; }
+    if (anyProcessing) { toast("Please wait for video processing to finish", "error"); return; }
 
     setLoading(true);
     try {
@@ -316,10 +347,11 @@ export function ComposeSheet() {
   }
 
   // ── Derived state ─────────────────────────────────────────────────────────
-  const remaining   = MAX - text.length;
-  const overLimit   = remaining < 0;
-  const anyUploading = mediaItems.some((m) => m.uploading);
-  const canPost     = !overLimit && !loading && !anyUploading &&
+  const remaining    = MAX - text.length;
+  const overLimit    = remaining < 0;
+  const anyUploading  = mediaItems.some((m) => m.uploading);
+  const anyProcessing = mediaItems.some((m) => m.processing);
+  const canPost      = !overLimit && !loading && !anyUploading && !anyProcessing &&
     (!!text.trim() || showPoll || mediaItems.length > 0);
 
   const replyLabel = replyPerm === "EVERYONE"
@@ -438,6 +470,12 @@ export function ComposeSheet() {
                           {m.uploading && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                               <Loader2 size={20} className="text-white animate-spin" />
+                            </div>
+                          )}
+                          {!m.uploading && m.processing && (
+                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1">
+                              <Loader2 size={16} className="text-white animate-spin" />
+                              <span className="text-[8px] text-white font-semibold">Processing</span>
                             </div>
                           )}
                           {m.error && (

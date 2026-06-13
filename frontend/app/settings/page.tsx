@@ -180,7 +180,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (view !== "security-login-activity") return;
     setSessionsLoading(true);
-    api.get<{ sessions: { id: string; createdAt: string; expiresAt: string }[] }>("/settings/sessions")
+    api.get<{ sessions: { id: string; createdAt: string; expiresAt: string; isCurrent: boolean }[] }>("/settings/sessions")
       .then((r) => setSessions(r.sessions))
       .catch(() => setSessions([]))
       .finally(() => setSessionsLoading(false));

@@ -16,6 +16,7 @@ interface MediaItem {
   previewUrl: string;
   serverId?: string;     // UUID returned by /media/upload
   uploading: boolean;
+  processing?: boolean;  // true while backend is doing HLS conversion
   error?: string;
 }
 
@@ -82,13 +83,20 @@ export function Composer({ parentId, onSuccess, placeholder, autoFocus = false }
     const form = new FormData();
     form.append("file", item.file);
     try {
-      const data = await api.upload<{ id: string; url: string; type: string }>("/media/upload", form);
+      const data = await api.upload<{ id: string; url: string | null; type: string; status: string }>(
+        "/media/upload", form,
+      );
+      const isProcessing = data.status === "PROCESSING";
       setMediaItems((prev) =>
         prev.map((m) => m.localId === item.localId
-          ? { ...m, serverId: data.id, uploading: false }
+          ? { ...m, serverId: data.id, uploading: false, processing: isProcessing }
           : m,
         ),
       );
+      // If backend is doing HLS conversion, poll for completion
+      if (isProcessing) {
+        pollMediaStatus(item.localId, data.id);
+      }
     } catch {
       setMediaItems((prev) =>
         prev.map((m) => m.localId === item.localId
@@ -97,6 +105,31 @@ export function Composer({ parentId, onSuccess, placeholder, autoFocus = false }
         ),
       );
     }
+  }
+
+  // ── Poll processing status every 3 s until READY or FAILED ─────────────────
+  function pollMediaStatus(localId: string, mediaId: string) {
+    const interval = setInterval(async () => {
+      try {
+        const data = await api.get<{ id: string; status: string }>(`/media/${mediaId}/status`);
+        if (data.status !== "PROCESSING") {
+          setMediaItems((prev) =>
+            prev.map((m) => m.localId === localId ? { ...m, processing: false } : m),
+          );
+          clearInterval(interval);
+        }
+      } catch {
+        // Keep polling on transient errors
+      }
+    }, 3000);
+
+    // Safety: clear after 10 minutes regardless
+    setTimeout(() => {
+      clearInterval(interval);
+      setMediaItems((prev) =>
+        prev.map((m) => m.localId === localId && m.processing ? { ...m, processing: false } : m),
+      );
+    }, 10 * 60 * 1000);
   }
 
   // ── Handle file selection ──────────────────────────────────────────────────
@@ -167,6 +200,7 @@ export function Composer({ parentId, onSuccess, placeholder, autoFocus = false }
   async function handlePost() {
     if (overLimit || (!text.trim() && !showPoll && mediaItems.length === 0)) return;
     if (mediaItems.some((m) => m.uploading)) { toast("Please wait for uploads to finish", "error"); return; }
+    if (mediaItems.some((m) => m.processing)) { toast("Please wait for video processing to finish", "error"); return; }
 
     setLoading(true);
     try {
@@ -208,8 +242,9 @@ export function Composer({ parentId, onSuccess, placeholder, autoFocus = false }
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handlePost();
   }
 
-  const anyUploading = mediaItems.some((m) => m.uploading);
-  const canPost = !overLimit && !loading && !anyUploading &&
+  const anyUploading  = mediaItems.some((m) => m.uploading);
+  const anyProcessing = mediaItems.some((m) => m.processing);
+  const canPost = !overLimit && !loading && !anyUploading && !anyProcessing &&
     (!!text.trim() || showPoll || mediaItems.length > 0);
 
   return (
@@ -279,6 +314,12 @@ export function Composer({ parentId, onSuccess, placeholder, autoFocus = false }
                     {m.uploading && (
                       <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                         <Loader2 size={20} className="text-white animate-spin" />
+                      </div>
+                    )}
+                    {!m.uploading && m.processing && (
+                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1">
+                        <Loader2 size={16} className="text-white animate-spin" />
+                        <span className="text-[8px] text-white font-semibold">Processing</span>
                       </div>
                     )}
                     {m.error && (
