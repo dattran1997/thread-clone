@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { useNotificationStore } from "@/stores/notifications";
@@ -45,14 +45,28 @@ const TYPE_BADGE: Record<NotifType, string> = {
 
 export default function ActivityPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useAuthStore((s) => s.user);
   const hasHydrated = useAuthStore((s) => s._hasHydrated);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const setUnreadCount = useNotificationStore((s) => s.setUnreadCount);
   const decrementUnread = useNotificationStore((s) => s.decrementUnread);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [filter, setFilter] = useState<FilterTab>("all");
+  // Read active filter from URL (?tab=all|mentions|follows)
+  const rawTab = searchParams.get("tab") as FilterTab | null;
+  const filter: FilterTab = rawTab === "mentions" || rawTab === "follows" ? rawTab : "all";
   const [loading, setLoading] = useState(true);
+
+  function switchFilter(f: FilterTab) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (f === "all") {
+      params.delete("tab");
+    } else {
+      params.set("tab", f);
+    }
+    const qs = params.toString();
+    router.replace(`/activity${qs ? `?${qs}` : ""}`, { scroll: false });
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -136,7 +150,7 @@ export default function ActivityPage() {
             {(["all", "mentions", "follows"] as FilterTab[]).map((f) => (
               <button
                 key={f}
-                onClick={() => setFilter(f)}
+                onClick={() => switchFilter(f)}
                 className={cn(
                   "relative flex-1 py-4 text-[15px] font-medium capitalize transition-colors",
                   filter === f ? "text-foreground" : "text-muted-foreground hover:text-foreground",

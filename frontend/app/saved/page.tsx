@@ -49,7 +49,7 @@ export default function SavedPage() {
         {/* Header */}
         <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-4 bg-background/90 backdrop-blur-xl border-b border-border">
           <button
-            onClick={() => router.back()}
+            onClick={() => typeof window !== "undefined" && window.history.length > 1 ? router.back() : router.push("/")}
             className="rounded-full p-2 text-foreground hover:bg-foreground/10 transition-colors"
           >
             <ChevronLeft size={20} />

@@ -13,7 +13,11 @@ export class UsersService {
       where: { username },
       include: {
         _count: {
-          select: { threads: true, followers: true, following: true },
+          select: {
+            threads: true,
+            followers: { where: { status: "ACCEPTED" } },
+            following: { where: { status: "ACCEPTED" } },
+          },
         },
       },
     });

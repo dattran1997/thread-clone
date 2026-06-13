@@ -98,7 +98,8 @@ export default function ThreadDetailPage() {
       <main className="w-full max-w-[622px] border-r border-border min-h-screen pb-14 md:pb-0">
         {/* Header */}
         <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-4 bg-background/90 backdrop-blur-xl border-b border-border">
-          <button onClick={() => router.back()}
+          <button
+            onClick={() => typeof window !== "undefined" && window.history.length > 1 ? router.back() : router.push("/")}
             className="rounded-full p-2 text-foreground hover:bg-foreground/10 transition-colors">
             <ChevronLeft size={20} />
           </button>

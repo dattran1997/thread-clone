@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { toast } from "@/components/ui/Toast";
 import { useAuthStore } from "@/stores/auth";
@@ -12,7 +12,6 @@ import { MobileNav } from "@/components/shell/MobileNav";
 import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { RightPanel } from "@/components/shell/RightPanel";
 
 interface Profile {
@@ -29,14 +28,38 @@ type ProfileTab = "posts" | "replies" | "reposts";
 export default function ProfilePage() {
   const { username } = useParams<{ username: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const viewer = useAuthStore((s) => s.user);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
-  const [tab, setTab] = useState<ProfileTab>("posts");
+  // Read active tab from URL (?tab=posts|replies|reposts), default to "posts"
+  const rawTab = searchParams.get("tab") as ProfileTab | null;
+  const tab: ProfileTab = rawTab === "replies" || rawTab === "reposts" ? rawTab : "posts";
   const [loading, setLoading] = useState(true);
   const [following, setFollowing] = useState(false);
 
   const isOwn = viewer?.username === username;
+
+  /** Switch to a tab and update the URL so the link is shareable */
+  function switchTab(newTab: ProfileTab) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (newTab === "posts") {
+      params.delete("tab");
+    } else {
+      params.set("tab", newTab);
+    }
+    const qs = params.toString();
+    router.replace(`/${username}${qs ? `?${qs}` : ""}`, { scroll: false });
+  }
+
+  /** Safe back: go back in history when available, fall back to home */
+  function goBack() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/");
+    }
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -104,7 +127,7 @@ export default function ProfilePage() {
       <main className="w-full max-w-[622px] border-r border-border min-h-screen pb-14 md:pb-0">
         {/* Header */}
         <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-4 bg-background/90 backdrop-blur-xl border-b border-border">
-          <button onClick={() => router.back()} className="text-foreground hover:text-muted-foreground transition-colors">
+          <button onClick={goBack} className="text-foreground hover:text-muted-foreground transition-colors">
             <ChevronLeft size={24} />
           </button>
           <span className="font-semibold text-foreground">{profile.displayName}</span>
@@ -212,7 +235,7 @@ export default function ProfilePage() {
         {/* Tabs */}
         <div className="flex border-b border-border sticky top-[57px] z-10 bg-background">
           {(["posts", "replies", "reposts"] as ProfileTab[]).map((t) => (
-            <button key={t} onClick={() => setTab(t)}
+            <button key={t} onClick={() => switchTab(t)}
               className={cn(
                 "relative flex-1 py-4 text-[15px] font-medium capitalize transition-colors",
                 tab === t ? "text-foreground" : "text-muted-foreground hover:text-foreground",

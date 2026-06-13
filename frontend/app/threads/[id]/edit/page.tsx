@@ -146,7 +146,7 @@ export default function EditThreadPage() {
         {/* Header */}
         <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-4 bg-background/90 backdrop-blur-xl border-b border-border">
           <div className="flex items-center gap-3">
-            <button onClick={() => router.back()} className="rounded-full p-2 text-foreground hover:bg-foreground/10 transition-colors">
+            <button onClick={() => typeof window !== "undefined" && window.history.length > 1 ? router.back() : router.push(`/threads/${id}`)} className="rounded-full p-2 text-foreground hover:bg-foreground/10 transition-colors">
               <ChevronLeft size={20} />
             </button>
             <span className="font-semibold text-foreground">Edit thread</span>
