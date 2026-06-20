@@ -3,3 +3,6 @@ node_modules
 .env
 
 /generated/prisma
+
+# Runtime upload storage (local dev only; swap to MinIO/S3 in prod)
+uploads/

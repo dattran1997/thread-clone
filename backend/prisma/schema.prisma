@@ -58,6 +58,12 @@ enum MediaType {
   AUDIO
 }
 
+enum MediaStatus {
+  READY
+  PROCESSING
+  FAILED
+}
+
 // ─────────────────────────────────────────────
 // USERS
 // ─────────────────────────────────────────────
@@ -215,15 +221,18 @@ model Thread {
 }
 
 model ThreadMedia {
-  id       String    @id @default(cuid())
+  id       String      @id @default(cuid())
   threadId String?
-  thread   Thread?   @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  url      String
+  thread   Thread?     @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  url      String?
+  hlsUrl   String?     // master .m3u8 URL for HLS-converted videos
   type     MediaType
   altText  String?
-  order    Int       @default(0)
+  order    Int         @default(0)
   width    Int?
   height   Int?
+  duration Int?        // video duration in seconds
+  status   MediaStatus @default(READY)
 
   @@index([threadId])
 }
